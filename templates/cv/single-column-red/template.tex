@@ -1,0 +1,136 @@
+%% Custom CV template: single-column-red
+%% Registered via /add-template. Profile-agnostic skeleton — [PLACEHOLDER] tokens
+%% are filled from the candidate profile by /apply.
+%%
+%% Compile with: lualatex -interaction=nonstopmode <file>.tex
+%% (Relies on native UTF-8 — do NOT switch to pdflatex without adding \usepackage[utf8]{inputenc}.)
+%% Requires an image file named picture.jpeg in the same directory as this .tex.
+
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[margin=1.8cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{xcolor}
+
+\definecolor{redBlood}{RGB}{188, 20, 20}
+
+% Fix alignment globally
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+\setlist[itemize]{leftmargin=*, noitemsep, topsep=0pt, partopsep=0pt}
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{8pt}{4pt}
+
+\begin{document}
+
+\noindent
+\begin{minipage}[t]{0.72\textwidth}
+\vspace{0pt}
+{\LARGE \textbf{[YOUR_NAME]}}\\[2pt]
+[YOUR_HEADLINE]\\[4pt]
+[YOUR_LOCATION] \;|\;
+\href{mailto:[YOUR_EMAIL]}{[YOUR_EMAIL]} \\
+[YOUR_PHONE] \;|\;
+\href{[YOUR_LINKEDIN_URL]}{LinkedIn}\;|\;
+\href{[YOUR_GITHUB_URL]}{[YOUR_GITHUB_HANDLE]}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.22\textwidth}
+\vspace{-8pt}
+\begin{flushright}
+\begin{tikzpicture}
+  \clip (0,0) circle (1.9cm);
+  \node at (0,-0.50) {\includegraphics[width=4.2cm]{picture.jpeg}};
+\end{tikzpicture}
+\end{flushright}
+\end{minipage}
+
+\vspace{4pt}
+
+% =====================
+\section*{Summary}
+\noindent [PROFILE_STATEMENT_PARAGRAPH_1 — tailored to the target role: who you are, core stack, what you deliver.]
+
+\noindent [PROFILE_STATEMENT_PARAGRAPH_2 — optional: end-to-end ownership, notable systems, engineering standards.]
+
+\noindent [PROFILE_STATEMENT_PARAGRAPH_3 — optional: degree, languages, work authorization / availability.]
+
+% =====================
+\section*{Core Skills}
+\noindent \textbf{[SKILL_CATEGORY_1]:} [comma-separated skills]\\
+\noindent \textbf{[SKILL_CATEGORY_2]:} [comma-separated skills]\\
+\noindent \textbf{[SKILL_CATEGORY_3]:} [comma-separated skills]\\
+\noindent \textbf{[SKILL_CATEGORY_4]:} [comma-separated skills]\\
+\noindent \textbf{[SKILL_CATEGORY_5]:} [comma-separated skills]
+% Add or remove \textbf{Category:} lines as the role requires.
+
+% =====================
+\section*{Professional Experience}
+
+% ---- Role block with named sub-projects (use when a role has distinct workstreams) ----
+\subsection*{\textbf{[JOB_TITLE]} \hfill \textit{[START_DATE] -- [END_DATE]}}
+\noindent \textbf{[COMPANY], [LOCATION] ([SHORT_CONTEXT])}
+
+\vspace{2pt}
+\noindent \textbf{[SUBPROJECT_OR_THEME_NAME]:}
+\begin{itemize}
+\item [Achievement or responsibility — be specific, use numbers where possible.]
+\item [Achievement or responsibility.]
+\item [Achievement or responsibility.]
+\end{itemize}
+\noindent \textit{Key achievement:} [headline measurable outcome for this role.]
+
+\vspace{6pt}
+% ---- Simple role block (title, company, bullets) ----
+\subsection*{\textbf{[JOB_TITLE]} \hfill \textit{[START_DATE] -- [END_DATE]}}
+\noindent \textbf{[COMPANY], [LOCATION] ([SHORT_CONTEXT])}
+\begin{itemize}
+\item [Achievement or responsibility.]
+\item [Achievement or responsibility.]
+\item [Achievement or responsibility.]
+\end{itemize}
+
+% Repeat \subsection* blocks per role, most recent first.
+
+% =====================
+\section*{Selected Project}
+\noindent \textbf{[PROJECT_NAME]} \href{[PROJECT_URL]}{\underline{[PROJECT_URL_TEXT]}} \hfill \textit{[PROJECT_TAGLINE]}
+
+\noindent [One-paragraph description of the project and what it demonstrates.]
+
+\vspace{2pt}
+\noindent \textcolor{redBlood}{\textbf{V1 -- [STATUS_LABEL]:}}
+
+\vspace{2pt}
+\noindent \textbf{Frontend:} [stack and highlights.]
+
+\noindent \textbf{Backend:} [stack and highlights.]
+
+\noindent \textbf{Integrations:} [APIs / services.]
+
+\noindent \textbf{Testing:} [coverage and tooling.]
+
+\noindent \textbf{Infrastructure:} [deployment, containers, CI/CD, HTTPS.]
+
+\vspace{2pt}
+\noindent \textcolor{redBlood}{\textbf{V2 -- Planned Enhancements:}}
+
+\vspace{2pt}
+\noindent \textbf{[AREA]:} [planned change.]
+
+% =====================
+\section*{Education}
+\noindent \textbf{[DEGREE_1]} -- [INSTITUTION_1], [COUNTRY_1] \hfill [YEARS_1]\\
+\noindent \hspace*{1em} [Thesis / distinction / key detail.]\\
+\noindent \textbf{[DEGREE_2]} -- [INSTITUTION_2], [COUNTRY_2] \hfill [YEARS_2]
+
+% =====================
+\section*{Languages \& Work Authorization}
+\noindent \textbf{Languages:} [LANGUAGES with levels]\\
+\noindent \textbf{Work Authorization:} [status — visa/residence, availability, remote/hybrid preference].
+
+\end{document}

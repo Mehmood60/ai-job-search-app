@@ -1,0 +1,133 @@
+%% Custom cover letter template: redblood-cover
+%% Registered via /add-template. Profile-agnostic skeleton — [PLACEHOLDER] tokens
+%% are filled from the candidate profile + job posting by /apply.
+%%
+%% Compile with: lualatex -interaction=nonstopmode <file>.tex
+%% (fontawesome5 is unreliable under pdflatex on modern MiKTeX; lualatex is safe.)
+%% One page maximum.
+
+\documentclass[12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{tgpagella}
+\usepackage{fontawesome5}
+\usepackage{xcolor}
+
+\geometry{
+a4paper,
+left=10mm,
+right=10mm,
+bottom=13mm,
+top=13mm
+}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\linespread{1.1}
+
+\newcommand{\firstname}{}
+\newcommand{\lastname}{[YOUR_NAME]}
+
+\definecolor{redBlood}{RGB}{188, 20, 20}
+\definecolor{grayShy}{RGB}{153, 150, 142}
+\newcommand{\mainColor}{redBlood}
+
+\newcommand{\svspace}{\vspace*{0.5em}}
+\newcommand{\mvspace}{\vspace*{1.0em}}
+\newcommand{\hvspace}{\vspace*{1.8em}}
+\newcommand{\negmvspace}{\vspace*{-1em}}
+
+\newcommand{\userInfo}[4]{%
+\begin{flushleft}
+\color{\mainColor}
+\Huge \textbf{\MakeUppercase{\lastname}}
+\color{black} \textbf{\firstname}
+\color{\mainColor}
+\par\noindent\rule{19.0cm}{0.8pt}
+\color{grayShy}
+\small
+\faMap\ #1 -- #2 \par \svspace
+\faPhone\ #3 \par \svspace
+\faEnvelopeOpen\ \texttt{#4}
+\color{\mainColor}
+\mvspace
+\end{flushleft}
+\negmvspace
+}
+
+% #1 = company name, #2 = company location line
+\newcommand{\companyInfo}[2]{%
+\begin{flushright}
+\small
+\textbf{\today}\par
+\textbf{#1}\par
+\color{grayShy}\textsc{\MakeLowercase{#2}}\par
+\color{black}
+\end{flushright}
+\hvspace
+}
+
+\newcommand{\object}[1]{%
+\small
+\color{\mainColor}\textbf{RE:}\ \color{black}\textbf{#1}\par
+}
+
+% #1 = letter body (greeting + paragraphs); #2 = signature block (pass \signature)
+\newcommand{\content}[2]{%
+\mvspace
+\small
+#1\par
+\svspace
+#2\par
+}
+
+\newcommand{\signature}{%
+\svspace
+\small
+Best regards,\par
+\svspace
+\textbf{\color{\mainColor}\MakeUppercase{\lastname}\color{black} \firstname}\par
+}
+
+\begin{document}
+\fontfamily{phv}\selectfont
+
+\userInfo
+{[YOUR_STREET_ADDRESS]}
+{[YOUR_POSTAL_CODE_CITY_COUNTRY]}
+{[YOUR_PHONE]}
+{[YOUR_EMAIL]}
+
+\companyInfo{[COMPANY]}{[COMPANY_LOCATION]}
+
+\object{[ROLE_TITLE]}\nopagebreak[4]
+
+\content{
+Dear [SALUTATION],
+
+\noindent [OPENING_PARAGRAPH — the role, why you are writing, and a specific connection to this company's mission. 2-3 sentences.]
+
+\noindent \textcolor{redBlood}{\textbf{About Me:}}
+
+\noindent [SHORT_PROFILE_PARAGRAPH — who you are, core stack, what you deliver. Tailored to the posting.]
+
+\noindent \textcolor{redBlood}{\textbf{Why I'm a good fit for this role:}}
+
+\noindent \textcolor{redBlood}{\textbf{[MATCH_1]:}} [one specific, evidence-backed sentence.]
+
+\noindent \textcolor{redBlood}{\textbf{[MATCH_2]:}} [one specific, evidence-backed sentence.]
+
+\noindent \textcolor{redBlood}{\textbf{[MATCH_3]:}} [one specific, evidence-backed sentence.]
+
+\noindent \textcolor{redBlood}{\textbf{[MATCH_4]:}} [one specific, evidence-backed sentence.]
+
+\noindent [CLOSING_PARAGRAPH — forward-looking: what you'll help them build. 1-2 sentences.]
+
+\noindent [Thank-you line and a confident sign-off sentence.]
+}
+
+\signature
+
+\end{document}

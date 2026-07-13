@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(job-application-assistant)",
+      "Bash(bun run:*)",
+      "Bash(python salary_lookup.py:*)",
+      "Bash(python3 salary_lookup.py:*)",
+      "Bash(pdftotext:*)",
+      "WebFetch(domain:www.linkedin.com)",
+      "Edit(/.claude/skills/job-application-assistant/**)",
+      "WebSearch",
+      "Bash([ -f \"$F\" ])",
+      "Read(//c/Users/MehmoodulHassan/.claude/projects/d--personal-mehmood-ai-job-search/memory/**)",
+      "WebFetch(domain:www.planbnetzero.com)",
+      "WebFetch(domain:www.businessmole.com)",
+      "Bash(python salary_lookup.py \"machineering\" --city \"Munich\" --json)",
+      "Bash(python salary_lookup.py \"edoc solutions gmbh\" --city \"Weilerswist\" --json)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\MehmoodulHassan\\OneDrive - VetControl GmbH\\Desktop\\CVs\\jobs\\Lumiform"
+    ]
+  }
+}

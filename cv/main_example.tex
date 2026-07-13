@@ -1,0 +1,188 @@
+%% Master CV - Mehmood Ul Hassan
+%% Comprehensive overview of all competencies, experience, and achievements.
+%% Use as a master reference when tailoring role-specific CVs (cv/main_<company>.tex).
+%%
+%% Compile with: lualatex main_example.tex
+%% (pdflatex often fails on modern MiKTeX with fontawesome5 font-expansion errors.)
+
+\documentclass[11pt,a4paper,sans]{moderncv}
+\moderncvstyle{banking}
+\moderncvcolor{blue}
+
+% Force both first and last name AND section headings to render in moderncv
+% blue (color1). Default banking on lualatex+MiKTeX leaves these black, which
+% looks inconsistent with the rest of the blue accent scheme.
+\renewcommand*{\firstnamestyle}[1]{{\fontsize{34}{36}\bfseries\upshape\color{color1}#1}}
+\renewcommand*{\lastnamestyle}[1]{{\fontsize{34}{36}\bfseries\upshape\color{color1}#1}}
+\renewcommand*{\sectionstyle}[1]{{\sectionfont\color{color1}#1}}
+
+\usepackage[utf8]{inputenc}
+\usepackage{needspace}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=blue,
+    pdftitle={Mehmood Ul Hassan - CV},
+    pdfpagemode=FullScreen,
+}
+\usepackage[scale=0.80]{geometry}
+\usepackage{import}
+
+% personal data
+\name{Mehmood}{Ul Hassan}
+\address{Saarbrücken, Germany}{}{}
+\phone[mobile]{+49 176 58410562}
+\email{mahmoodulhassan60@gmail.com}
+\extrainfo{\href{https://www.linkedin.com/in/mehmood-ul-hassan-73a7b878}{LinkedIn}, \href{https://github.com/Mehmood60}{GitHub}}
+
+\begin{document}
+
+\makecvtitle
+
+% ============================================================
+%     PROFILE STATEMENT
+% ============================================================
+
+\vspace{6pt}
+\small{Full Stack Engineer with 5+ years building and shipping production web applications end-to-end. Specializes in React, Next.js, and TypeScript on the frontend and Node.js and PHP on the backend, backed by PostgreSQL/MySQL, Docker, and CI/CD. Has owned systems from architecture through live deployment, including a production billing platform and a self-hosted eBay operations platform deployed live with Docker and automatic HTTPS. Former startup CTO who ships fast without sacrificing quality (85\%+ test coverage). Permanent German resident, open to hybrid or remote roles across Germany.}
+
+% ============================================================
+%     CORE COMPETENCIES
+% ============================================================
+
+\section{Core Competencies}
+\vspace{1pt}
+\begin{itemize}
+
+\item \textbf{Frontend}: React (Hooks, Context), Next.js 14, TypeScript, JavaScript (ES6+), Angular, TailwindCSS, HTML5/CSS3, accessibility (WCAG 2.1).
+
+\item \textbf{Backend}: Node.js (Express), PHP (CakePHP), Python (1 year), REST APIs, Webhooks, JWT, OAuth2, WebSockets, MQTT.
+
+\item \textbf{Databases}: PostgreSQL, MySQL, MariaDB, Prisma ORM; query optimization, schema design, data modeling.
+
+\item \textbf{DevOps \& Cloud}: Docker (multi-stage), CI/CD (GitLab CI, GitHub Actions), Git, Linux, Caddy, AWS (EC2, S3, RDS, CloudWatch).
+
+\item \textbf{Testing \& Quality}: Jest, React Testing Library, Vitest, PHPUnit (85\%+ coverage), unit \& integration testing, code reviews, clean code.
+
+\item \textbf{AI/LLM \& Mobile}: Groq API (LLaMA 3.1), prompt engineering, AI-assisted development (Cursor, Copilot, Claude Code); React Native (iOS/Android).
+
+\end{itemize}
+
+% ============================================================
+%     PROFESSIONAL EXPERIENCE
+% ============================================================
+
+\section{Professional Experience}
+\vspace{3pt}
+\begin{itemize}
+
+% --- Most Recent Role ---
+\needspace{5\baselineskip}
+\item{\cventry{2024--Present}{Software Engineer (Full-Stack)}{VetControl GmbH}{Germany}{}{\vspace{1pt}
+\begin{itemize}
+    \item Built and maintained the PettiPay production billing platform (Node.js, PHP, MySQL, MQTT, REST) handling financial transactions with external insurance providers at scale.
+    \item Reduced production inconsistencies by 25\% via redesigned cron-based invoice workflows with structured validation, idempotency, and retry logic.
+    \item Delivered a complete user-management system solo end-to-end: DB schema, Node.js REST APIs, JWT auth, RBAC, and an Angular frontend with lazy-loaded modules and token-refresh interceptors.
+    \item Built multi-engine OCR validation/fallback pipelines with confidence scoring, improving reliability by 30\%; cut frontend bundle size 25\% via code splitting and lazy loading.
+    \item Delivered 8+ major features on time with zero production-critical bugs in the last 6 months.
+\end{itemize}}}
+
+\vspace{3pt}
+
+% --- Previous Role ---
+\needspace{5\baselineskip}
+\item{\cventry{2022--2024}{Backend Software Engineer}{DFKI (German Research Center for AI)}{Germany}{}{\vspace{1pt}
+\begin{itemize}
+    \item Built PHP (CakePHP) and Python backends serving educational platforms at 1M+ requests/month; integrated third-party Python ML services via PHP APIs.
+    \item Studyfinder: led the CakePHP backend, optimized SQL queries reducing response time by 40\% for 50K+ monthly users.
+    \item Delivered KIPerWeb (PHP REST APIs fronting Python ML), CTC Finder (WCAG 2.1 survey systems), and KI-WW (reusable React components with WordPress via Storybook).
+\end{itemize}}}
+
+\vspace{3pt}
+
+% --- Earlier Role ---
+\needspace{5\baselineskip}
+\item{\cventry{2019--2022}{CTO / Founding Full-Stack Engineer}{Guel GmbH}{Germany}{}{\vspace{1pt}
+\begin{itemize}
+    \item Built B2B SaaS products from scratch (React, Node.js, Express, MySQL); shipped MVP in 6 weeks and scaled from 0 to 500+ B2B users in 18 months at 99.9\% uptime.
+    \item Led a team of 4 with coding standards, GitFlow, code reviews, and 85\%+ test coverage; built React Native telemedicine apps (hello-doctor.de, hello-sister.de).
+    \item Dockerized with multi-stage builds and CI/CD; optimized PostgreSQL schema reducing P95 latency from 800ms to 200ms.
+\end{itemize}}}
+
+\vspace{3pt}
+
+% --- Internship ---
+\needspace{5\baselineskip}
+\item{\cventry{2019}{Software Engineering Intern — Mixed Reality Platform}{Didactic Innovations}{Germany}{}{\vspace{1pt}
+\begin{itemize}
+    \item Built a web + HoloLens (Unity/MRTK) prototype for on-site technician support: Angular admin panel, Node.js/Express REST APIs, Neo4j graph database, JWT auth, and WebSocket sync.
+\end{itemize}}}
+
+\end{itemize}
+
+% ============================================================
+%     EDUCATION
+% ============================================================
+
+\section{Education}
+\vspace{1pt}
+\begin{itemize}
+
+\needspace{4\baselineskip}
+\item{\cventry{2018--2020}{M.Sc. Media Informatics (Distinction)}{Saarland University}{Germany}{}{\vspace{1pt}
+Thesis: ``Collaborative Virtual Reality-Based System for Industrial Manufacturing Training.'' Built a multi-user VR training system (Unity3D, C\#, Photon); user study with 20+ trainees showing significant learning gains (p < 0.05).
+}}
+
+\vspace{3pt}
+
+\item{\cventry{2010--2014}{B.Sc. Information Technology}{Bahauddin Zakariya University}{Pakistan}{}{\vspace{1pt}
+Computer science and information technology fundamentals.
+}}
+
+\end{itemize}
+
+% ============================================================
+%     SELECTED PROJECT
+% ============================================================
+
+\section{Selected Project}
+\vspace{1pt}
+\begin{itemize}
+\item{\cventry{}{SellSmart — eBay Seller Operations Platform}{\href{https://github.com/Mehmood60/seller-operations-platform}{GitHub}}{Live in production}{}{\vspace{1pt}
+Self-hosted platform for eBay sellers (orders, listings, analytics, AI-assisted listing generation). Next.js 14 + TypeScript frontend; PHP 8.2 REST API; eBay OAuth 2.0 + Groq (LLaMA 3.1); 100+ tests (PHPUnit + Vitest); multi-stage Docker + Caddy automatic HTTPS on a Linux cloud VM. Built with heavy use of Claude Code.
+}}
+\end{itemize}
+
+% ============================================================
+%     LANGUAGES
+% ============================================================
+
+\section{Languages}
+\vspace{1pt}
+\begin{itemize}
+\item English (C1, fluent), German (B1), Urdu (native).
+\end{itemize}
+
+% ============================================================
+%     HONORS AND AWARDS
+% ============================================================
+
+\section{Honors and Awards}
+\vspace{1pt}
+\begin{itemize}
+\item{\textbf{M.Sc. Thesis — Distinction} -- Saarland University (2020).}
+\end{itemize}
+
+% ============================================================
+%     REFERENCES
+% ============================================================
+
+\section{References}
+\vspace{1pt}
+\begin{itemize}
+\item{Available upon request.}
+\end{itemize}
+
+\end{document}
