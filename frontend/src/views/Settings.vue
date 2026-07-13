@@ -99,7 +99,7 @@ const saveLatexCover = () => act(() => store.setLatexTemplate('cover', latexCove
     <div class="card">
       <h2 class="font-semibold">LaTeX templates (optional)</h2>
       <p class="mb-3 text-sm text-gray-500">
-        Paste your own LaTeX source with a <code>{{ '{{CONTENT}}' }}</code> placeholder where the generated content
+        Paste your own LaTeX source with a <code v-pre>{{CONTENT}}</code> placeholder where the generated content
         should go. Used only if a TeX toolchain is available; otherwise the app renders a clean HTML→PDF.
         {{ store.settings.hasLatexCv ? 'CV template set.' : '' }} {{ store.settings.hasLatexCover ? 'Cover template set.' : '' }}
       </p>
