@@ -1,4 +1,5 @@
 import { ProviderId } from '../db/types';
+import { AppError } from '../http/errors';
 
 export interface CompleteOptions {
   system: string;
@@ -43,7 +44,20 @@ export async function openAiCompatibleComplete(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`Provider request failed (${res.status}): ${detail.slice(0, 500)}`);
+    // Surface the provider's own message (e.g. rate-limit / too-large) to the client.
+    let message = `Provider request failed (${res.status})`;
+    let code = 'PROVIDER_ERROR';
+    try {
+      const j = JSON.parse(detail) as { error?: { message?: string; code?: string } };
+      if (j.error?.message) message = j.error.message;
+      if (j.error?.code) code = j.error.code;
+    } catch {
+      if (detail) message += `: ${detail.slice(0, 300)}`;
+    }
+    // Map upstream status: rate-limit / too-large → 429, other 4xx → 400, else 502.
+    const status =
+      res.status === 429 || res.status === 413 ? 429 : res.status >= 400 && res.status < 500 ? 400 : 502;
+    throw new AppError(status, message, code);
   }
 
   const data = (await res.json()) as {

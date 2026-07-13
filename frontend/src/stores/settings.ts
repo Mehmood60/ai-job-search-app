@@ -2,7 +2,9 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api } from '../api/client';
 
-export type ProviderId = 'grok' | 'openai' | 'claude';
+// Provider ids are dynamic: built-ins ('grok' | 'groq' | 'openai' | 'claude') plus
+// user-defined custom provider ids.
+export type ProviderId = string;
 
 export interface ProviderView {
   id: ProviderId;
@@ -11,6 +13,8 @@ export interface ProviderView {
   configured: boolean;
   maskedKey: string;
   model: string;
+  custom: boolean;
+  baseUrl?: string;
 }
 
 export interface SettingsView {
@@ -18,6 +22,13 @@ export interface SettingsView {
   providers: ProviderView[];
   hasLatexCv: boolean;
   hasLatexCover: boolean;
+}
+
+export interface CustomProviderInput {
+  label: string;
+  baseUrl: string;
+  defaultModel: string;
+  apiKey?: string;
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -43,10 +54,29 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value = data;
   }
 
+  async function addCustomProvider(input: CustomProviderInput) {
+    const { data } = await api.post<SettingsView>('/settings/custom-provider', input);
+    settings.value = data;
+  }
+
+  async function removeCustomProvider(id: ProviderId) {
+    const { data } = await api.delete<SettingsView>(`/settings/custom-provider/${encodeURIComponent(id)}`);
+    settings.value = data;
+  }
+
   async function setLatexTemplate(kind: 'cv' | 'cover', source: string | null) {
     const { data } = await api.put<SettingsView>('/settings/latex-template', { kind, source });
     settings.value = data;
   }
 
-  return { settings, load, setApiKey, setModel, setActiveProvider, setLatexTemplate };
+  return {
+    settings,
+    load,
+    setApiKey,
+    setModel,
+    setActiveProvider,
+    addCustomProvider,
+    removeCustomProvider,
+    setLatexTemplate,
+  };
 });

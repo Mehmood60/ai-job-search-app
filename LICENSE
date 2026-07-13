@@ -1,6 +1,15 @@
 MIT License
 
 Copyright (c) 2026 Mads Lorentzen
+  — original Claude Code job-search workspace (.claude/, .agents/, cv/,
+    cover_letters/, templates/, skills and slash-commands, salary_lookup.py, etc.)
+
+Copyright (c) 2026 Mehmood Ul Hassan
+  — AI Job Search web app (backend/ and frontend/) and related modifications
+
+This project builds on Mads Lorentzen's original workspace, which remains under the
+MIT License below; the web application added on top is © Mehmood Ul Hassan under the
+same terms. See README.md / WORKSPACE.md for what is original vs. added.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

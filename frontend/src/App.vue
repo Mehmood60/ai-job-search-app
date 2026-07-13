@@ -15,8 +15,7 @@ function logout() {
 }
 
 const links = [
-  { to: '/generate', label: 'Generate' },
-  { to: '/evaluate', label: 'Evaluate' },
+  { to: '/apply', label: 'Apply' },
   { to: '/profile', label: 'Profile' },
   { to: '/settings', label: 'Settings' },
 ];

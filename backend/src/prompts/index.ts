@@ -83,7 +83,57 @@ Return strict JSON only (no markdown outside the JSON) with this exact shape:
   "redFlags": ["<anything that would hurt parsing or screening>", ...]
 }`;
 
+export const EXTRACT_PROFILE_SYSTEM = `You are a résumé/CV parser. Extract a structured candidate profile from the CV text (which may be LaTeX source or plain text extracted from a PDF).
+Rules:
+- Use ONLY information present in the CV. Never invent skills, employers, dates, or achievements. Leave a field empty ("" or []) if the CV does not contain it.
+- Strip any leftover LaTeX commands/markup — return clean human-readable text values (e.g. "\\textbf{React}" becomes "React").
+- COMPLETENESS IS CRITICAL. Do not summarize, shorten, merge, or omit content:
+  - "summary": capture the ENTIRE professional summary/profile section — every sentence and paragraph. Preserve paragraph breaks as "\\n\\n".
+  - "experience[].bullets": include EVERY bullet/line under each role, verbatim, as a separate array item. Never collapse multiple bullets into one and never drop any.
+  - Include ALL roles, education entries, projects, skills, languages, and certifications that appear anywhere in the CV.
+- Dates as written in the CV (e.g. "Feb 2024", "2018-2020", "Present").
+Return strict JSON only (no markdown, no prose outside the JSON) with this exact shape:
+{
+  "fullName": "",
+  "headline": "",
+  "email": "",
+  "phone": "",
+  "location": "",
+  "links": [{ "label": "", "url": "" }],
+  "summary": "",
+  "skills": [""],
+  "experience": [{ "title": "", "company": "", "location": "", "start": "", "end": "", "bullets": [""] }],
+  "education": [{ "degree": "", "institution": "", "location": "", "start": "", "end": "", "notes": "" }],
+  "projects": [{ "name": "", "description": "", "url": "" }],
+  "languages": [""],
+  "certifications": [""]
+}`;
+
+// Tailors a COPY of the user's own document (LaTeX or plain text). The original is
+// never modified — we only ask the model to return a tailored copy.
+const TAILOR_RULES = `You tailor an EXISTING job-application document to a specific job posting. You are given the candidate's own document verbatim and must return a tailored COPY.
+ABSOLUTE RULES:
+- Preserve the document's format exactly. If it is LaTeX, return valid LaTeX with the SAME preamble, packages, structure, environments, and commands — only change text where noted. Do not add or remove packages. Keep the image/graphics commands intact.
+- DO NOT shorten, summarize, remove, or reorder sections, roles, bullets, projects, or skills. Every piece of content in the original must still be present.
+- Only change WORDING and KEYWORDS: adjust the headline/summary and phrasing, and weave in the posting's exact terminology where it is genuinely true of the candidate, to maximise keyword match with the job. Reorder emphasis within a bullet if helpful, but keep all bullets.
+- Never fabricate skills, employers, dates, metrics, or achievements. If the posting wants something the candidate lacks, leave it out — do not invent it.
+- Rely ONLY on facts already present in the document — do not add new employers, skills, or achievements that aren't there.
+- Where the candidate genuinely uses AI/agentic tooling, you may reference "Claude Code" by name.
+Return ONLY the complete tailored document. No markdown code fences, no commentary before or after.`;
+
+export const TAILOR_CV_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's CV/résumé.`;
+export const TAILOR_COVER_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's cover letter. Also update the addressed company/role and the specific hook to fit this posting, keeping the same overall length and structure.`;
+
+export function tailorUser(originalDoc: string, jobText: string): string {
+  return `TARGET JOB POSTING:\n${jobText}\n\nORIGINAL DOCUMENT TO TAILOR (return a tailored copy in the SAME format, changing only wording/keywords):\n${originalDoc}`;
+}
+
 // ── User-prompt builders ──
+
+export function extractProfileUser(cvText: string): string {
+  return `CV SOURCE:\n${cvText}\n\nExtract the candidate profile and return the JSON.`;
+}
+
 
 export function evaluateUser(profileText: string, jobText: string): string {
   return `CANDIDATE PROFILE:\n${profileText}\n\nJOB POSTING:\n${jobText}\n\nAssess the fit and return the JSON.`;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { api, apiError } from '../api/client';
+import { useSettingsStore } from '../stores/settings';
 
 interface Experience {
   title: string;
@@ -49,6 +50,12 @@ const skillsStr = ref('');
 const languagesStr = ref('');
 const certsStr = ref('');
 
+// Autofill-from-CV state.
+const settingsStore = useSettingsStore();
+const hasSavedCv = computed(() => !!settingsStore.settings?.hasLatexCv);
+const autofilling = ref(false);
+const autofillNote = ref('');
+
 function blank(): Profile {
   return {
     fullName: '', headline: '', email: '', phone: '', location: '',
@@ -57,19 +64,78 @@ function blank(): Profile {
   };
 }
 
+function applyProfileData(data: Partial<Profile>) {
+  p.value = { ...blank(), ...data };
+  skillsStr.value = p.value.skills.join(', ');
+  languagesStr.value = p.value.languages.join(', ');
+  certsStr.value = p.value.certifications.join(', ');
+}
+
 onMounted(async () => {
   try {
     const { data } = await api.get<Profile>('/profile');
-    p.value = { ...blank(), ...data };
-    skillsStr.value = p.value.skills.join(', ');
-    languagesStr.value = p.value.languages.join(', ');
-    certsStr.value = p.value.certifications.join(', ');
+    applyProfileData(data);
+    await settingsStore.load().catch(() => {}); // for the "autofill from saved CV" option
   } catch (e) {
     error.value = apiError(e);
   }
 });
 
 const splitList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
+
+// Read a File as a base64 string (no data: prefix).
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function fileToText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+async function runAutofill(payload: Record<string, unknown>) {
+  error.value = '';
+  autofillNote.value = '';
+  autofilling.value = true;
+  try {
+    const { data } = await api.post<{ profile: Partial<Profile>; usedProvider: string }>(
+      '/profile/autofill',
+      payload,
+    );
+    applyProfileData(data.profile);
+    autofillNote.value = `Imported from your CV via ${data.usedProvider}. Review the fields below, then click Save profile.`;
+  } catch (e) {
+    error.value = apiError(e);
+  } finally {
+    autofilling.value = false;
+  }
+}
+
+const autofillFromSaved = () => runAutofill({ useSavedCv: true });
+
+async function autofillFromFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    const payload = isPdf ? { pdfBase64: await fileToBase64(file) } : { cvText: await fileToText(file) };
+    await runAutofill(payload);
+  } catch (err) {
+    error.value = apiError(err);
+  } finally {
+    input.value = ''; // allow re-selecting the same file
+  }
+}
 
 async function save() {
   error.value = '';
@@ -104,6 +170,43 @@ const addLink = () => p.value.links.push({ label: '', url: '' });
   </div>
   <p v-if="error" class="mb-4 text-sm text-brand">{{ error }}</p>
 
+  <!-- Autofill from CV -->
+  <div class="card mb-6 border-brand/30 bg-brand/5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="font-semibold">Autofill from your CV</h2>
+        <p class="text-xs text-gray-500">
+          Let the AI read your CV and fill in the fields below. You review and save — nothing is stored until you click
+          Save profile.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          v-if="hasSavedCv"
+          class="btn-primary"
+          :disabled="autofilling"
+          @click="autofillFromSaved"
+        >
+          {{ autofilling ? 'Extracting…' : 'Autofill from saved CV' }}
+        </button>
+        <label class="btn-ghost cursor-pointer">
+          {{ autofilling ? 'Extracting…' : 'Upload PDF / .tex' }}
+          <input
+            type="file"
+            accept=".pdf,.tex,application/pdf,text/plain"
+            class="hidden"
+            :disabled="autofilling"
+            @change="autofillFromFile"
+          />
+        </label>
+      </div>
+    </div>
+    <p v-if="!hasSavedCv" class="mt-2 text-xs text-gray-400">
+      Tip: save a LaTeX CV in Settings to enable one-click autofill from it.
+    </p>
+    <p v-if="autofillNote" class="mt-3 text-sm text-green-600">{{ autofillNote }}</p>
+  </div>
+
   <div class="space-y-6">
     <div class="card grid gap-4 md:grid-cols-2">
       <div><label class="label">Full name</label><input v-model="p.fullName" class="input" /></div>
@@ -111,7 +214,7 @@ const addLink = () => p.value.links.push({ label: '', url: '' });
       <div><label class="label">Email</label><input v-model="p.email" class="input" /></div>
       <div><label class="label">Phone</label><input v-model="p.phone" class="input" /></div>
       <div><label class="label">Location</label><input v-model="p.location" class="input" /></div>
-      <div class="md:col-span-2"><label class="label">Summary</label><textarea v-model="p.summary" rows="3" class="input" /></div>
+      <div class="md:col-span-2"><label class="label">Summary</label><textarea v-model="p.summary" rows="5" class="input resize-y leading-relaxed" /></div>
       <div class="md:col-span-2"><label class="label">Skills (comma-separated)</label><input v-model="skillsStr" class="input" /></div>
       <div><label class="label">Languages (comma-separated)</label><input v-model="languagesStr" class="input" /></div>
       <div><label class="label">Certifications (comma-separated)</label><input v-model="certsStr" class="input" /></div>
@@ -145,8 +248,8 @@ const addLink = () => p.value.links.push({ label: '', url: '' });
         <label class="label mt-2">Bullets (one per line)</label>
         <textarea
           :value="e.bullets.join('\n')"
-          rows="3"
-          class="input text-sm"
+          rows="6"
+          class="input resize-y text-sm leading-relaxed"
           @input="e.bullets = ($event.target as HTMLTextAreaElement).value.split('\n')"
         />
         <button class="btn-ghost mt-2" @click="p.experience.splice(i, 1)">Remove role</button>
@@ -174,7 +277,7 @@ const addLink = () => p.value.links.push({ label: '', url: '' });
       <div v-for="(pr, i) in p.projects" :key="i" class="mb-3 grid gap-2">
         <input v-model="pr.name" class="input" placeholder="Project name" />
         <input v-model="pr.url" class="input" placeholder="URL (optional)" />
-        <textarea v-model="pr.description" rows="2" class="input" placeholder="Description" />
+        <textarea v-model="pr.description" rows="3" class="input resize-y leading-relaxed" placeholder="Description" />
         <button class="btn-ghost" @click="p.projects.splice(i, 1)">Remove</button>
       </div>
     </div>

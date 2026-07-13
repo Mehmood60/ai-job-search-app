@@ -1,6 +1,16 @@
 // Domain models shared across the JSON and Postgres data layers.
 
-export type ProviderId = 'grok' | 'openai' | 'claude';
+// Provider ids are dynamic: the built-ins ('grok' | 'groq' | 'openai' | 'claude')
+// plus any user-defined custom provider ids. Kept as a string alias for clarity.
+export type ProviderId = string;
+
+// A user-defined, OpenAI-compatible AI provider added via Settings → "Add new model".
+export interface CustomProvider {
+  id: string; // stable uuid, generated on creation
+  label: string; // display name, e.g. "DeepSeek"
+  baseUrl: string; // OpenAI-compatible base, e.g. https://api.groq.com/openai/v1
+  defaultModel: string; // e.g. "deepseek-chat"
+}
 
 export interface User {
   id: string;
@@ -58,10 +68,12 @@ export interface Profile {
 export interface Settings {
   userId: string;
   activeProvider: ProviderId;
-  // encrypted at rest (see crypto/secrets.ts). Empty string = not set.
-  apiKeys: Record<ProviderId, string>;
-  // optional per-provider model override; empty = provider default
-  models: Partial<Record<ProviderId, string>>;
+  // encrypted at rest (see crypto/secrets.ts), keyed by provider id. Missing = not set.
+  apiKeys: Record<string, string>;
+  // optional per-provider model override, keyed by provider id; missing = provider default
+  models: Record<string, string>;
+  // user-defined OpenAI-compatible providers
+  customProviders: CustomProvider[];
   latexTemplates: {
     cv?: string; // raw .tex source with {{PLACEHOLDER}} tokens
     cover?: string;
@@ -93,8 +105,9 @@ export function defaultSettings(userId: string): Settings {
   return {
     userId,
     activeProvider: 'grok', // Grok is the default provider slot
-    apiKeys: { grok: '', openai: '', claude: '' },
+    apiKeys: {},
     models: {},
+    customProviders: [],
     latexTemplates: {},
     updatedAt: new Date().toISOString(),
   };
