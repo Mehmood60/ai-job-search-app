@@ -111,14 +111,20 @@ Return strict JSON only (no markdown, no prose outside the JSON) with this exact
 
 // Tailors a COPY of the user's own document (LaTeX or plain text). The original is
 // never modified — we only ask the model to return a tailored copy.
-const TAILOR_RULES = `You tailor an EXISTING job-application document to a specific job posting. You are given the candidate's own document verbatim and must return a tailored COPY.
-ABSOLUTE RULES:
-- Preserve the document's format exactly. If it is LaTeX, return valid LaTeX with the SAME preamble, packages, structure, environments, and commands — only change text where noted. Do not add or remove packages. Keep the image/graphics commands intact.
-- DO NOT shorten, summarize, remove, or reorder sections, roles, bullets, projects, or skills. Every piece of content in the original must still be present.
-- Only change WORDING and KEYWORDS: adjust the headline/summary and phrasing, and weave in the posting's exact terminology where it is genuinely true of the candidate, to maximise keyword match with the job. Reorder emphasis within a bullet if helpful, but keep all bullets.
-- Never fabricate skills, employers, dates, metrics, or achievements. If the posting wants something the candidate lacks, leave it out — do not invent it.
-- Rely ONLY on facts already present in the document — do not add new employers, skills, or achievements that aren't there.
-- Where the candidate genuinely uses AI/agentic tooling, you may reference "Claude Code" by name.
+const TAILOR_RULES = `You tailor an EXISTING job-application document to a job posting. You are given the candidate's own document verbatim and return a tailored COPY. Your ONLY freedom is to rephrase and reorder content that is ALREADY in the document.
+
+HARD CONSTRAINTS — breaking ANY of these makes the output unusable and is worse than doing nothing:
+- NEVER add, rename, substitute, imply, or emphasise any technology, framework, tool, library, standard, methodology, certification, employer, title, or domain that is NOT already written verbatim in the original document. Concrete examples of FORBIDDEN edits: if the document says "CakePHP", you may not write "Symfony"; if it does not contain "Kubernetes"/"K8s", you may not add it; if it does not contain "HL7", "FHIR", "Mirth", or "API Platform", you may not add them.
+- Do NOT change the candidate's tech stack, skills list, job titles, employers, dates, or metrics. Every factual claim must stay identical in meaning.
+- If the job requires something the document does not contain, LEAVE IT OUT. Honest gaps MUST remain visible. Never fabricate to close a gap — this is the most important rule.
+- Do NOT shorten, remove, or drop any section, role, bullet, project, or skill. All original content stays.
+
+WHAT YOU MAY DO (only this):
+- Rephrase the summary/profile and headline using ONLY words and skills already present in the document, to foreground the genuinely-relevant experience.
+- Reorder existing skills/bullets so the most relevant TRUE ones appear first.
+- Adjust tone/wording. You may name the target company in the summary as an aspiration (e.g. "eager to contribute to <Company>").
+
+Preserve the document's format exactly. If it is LaTeX, return valid LaTeX with the SAME preamble, packages, structure, environments, and commands; keep image/graphics commands intact.
 Return ONLY the complete tailored document. No markdown code fences, no commentary before or after.`;
 
 export const TAILOR_CV_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's CV/résumé.`;

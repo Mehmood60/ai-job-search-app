@@ -7,6 +7,10 @@ export interface CompleteOptions {
   maxTokens?: number;
   // optional per-call model override
   model?: string;
+  // request strict JSON output (OpenAI-compatible response_format json_object)
+  json?: boolean;
+  // sampling temperature (lower = more faithful/deterministic)
+  temperature?: number;
 }
 
 // Uniform interface every AI provider implements.
@@ -19,28 +23,37 @@ export interface AIProvider {
   complete(apiKey: string, opts: CompleteOptions): Promise<string>;
 }
 
-// Shared helper for the two OpenAI-compatible providers (Grok + OpenAI/ChatGPT).
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Shared helper for OpenAI-compatible providers (Groq, OpenAI/ChatGPT, custom models).
 export async function openAiCompatibleComplete(
   baseUrl: string,
   apiKey: string,
   model: string,
   opts: CompleteOptions,
 ): Promise<string> {
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: opts.maxTokens ?? 4096,
-      messages: [
-        { role: 'system', content: opts.system },
-        { role: 'user', content: opts.user },
-      ],
-    }),
+  const body = JSON.stringify({
+    model,
+    max_tokens: opts.maxTokens ?? 4096,
+    ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+    ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
+    messages: [
+      { role: 'system', content: opts.system },
+      { role: 'user', content: opts.user },
+    ],
   });
+
+  let res: Response;
+  // Retry transient upstream errors (502/503/504 — gateway/timeout blips) once.
+  for (let attempt = 0; ; attempt++) {
+    res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body,
+    });
+    if (res.ok || res.status < 500 || attempt >= 1) break;
+    await sleep(2000);
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');

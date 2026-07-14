@@ -111,8 +111,8 @@ function onFile(e: Event, target: 'cv' | 'cover') {
 <template>
   <h1 class="mb-2 text-2xl font-bold">Settings</h1>
   <p class="mb-6 text-sm text-gray-500">
-    Add an API key for any provider to use it. The keyed provider you activate becomes primary; Grok stays the
-    fallback. Use <strong>Add new model</strong> to connect any OpenAI-compatible API (Groq, DeepSeek, OpenRouter,
+    Add an API key for any provider to use it. The keyed provider you activate becomes primary; Groq stays the
+    fallback. Use <strong>Add new model</strong> to connect any OpenAI-compatible API (Gemini, DeepSeek, OpenRouter,
     local LLMs, …). Keys are encrypted at rest and never shown again.
   </p>
 
@@ -131,7 +131,7 @@ function onFile(e: Event, target: 'cv' | 'cover') {
           <h2 class="font-semibold">
             {{ prov.label }}
             <span v-if="store.settings.activeProvider === prov.id" class="ml-2 rounded bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand">ACTIVE</span>
-            <span v-else-if="prov.id === 'grok'" class="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">default fallback</span>
+            <span v-else-if="prov.id === store.settings.fallbackId" class="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">fallback</span>
             <span v-if="prov.custom" class="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-600">custom</span>
           </h2>
           <p class="text-xs text-gray-400">

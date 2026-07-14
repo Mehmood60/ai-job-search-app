@@ -20,6 +20,9 @@ const schema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
   PUPPETEER_EXECUTABLE_PATH: z.string().optional(),
+
+  // Path to the Tectonic binary used to compile tailored LaTeX → PDF.
+  TECTONIC_PATH: z.string().default('tectonic'),
 });
 
 const parsed = schema.safeParse(process.env);

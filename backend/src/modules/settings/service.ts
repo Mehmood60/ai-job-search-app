@@ -9,6 +9,7 @@ import { loadSettings } from '../userData';
 // A safe, client-facing view of settings — never exposes raw API keys.
 export interface SettingsView {
   activeProvider: ProviderId;
+  fallbackId?: ProviderId; // the provider auto-used if the active one fails
   providers: {
     id: ProviderId;
     label: string;
@@ -26,22 +27,26 @@ export interface SettingsView {
 export function toView(settings: Settings): SettingsView {
   const customIds = new Set(settings.customProviders.map((c) => c.id));
   const baseUrlById = new Map(settings.customProviders.map((c) => [c.id, c.baseUrl]));
+  const providers = listProviders(settings).map((p) => {
+    const enc = settings.apiKeys[p.id];
+    const key = enc ? decryptSecret(enc) : '';
+    return {
+      id: p.id,
+      label: p.label,
+      defaultModel: p.defaultModel,
+      configured: !!key,
+      maskedKey: maskSecret(key),
+      model: settings.models[p.id] || p.defaultModel,
+      custom: customIds.has(p.id),
+      baseUrl: baseUrlById.get(p.id),
+    };
+  });
+  // Fallback = first keyed provider (in preference order) that isn't the active one.
+  const fallbackId = providers.find((p) => p.configured && p.id !== settings.activeProvider)?.id;
   return {
     activeProvider: settings.activeProvider,
-    providers: listProviders(settings).map((p) => {
-      const enc = settings.apiKeys[p.id];
-      const key = enc ? decryptSecret(enc) : '';
-      return {
-        id: p.id,
-        label: p.label,
-        defaultModel: p.defaultModel,
-        configured: !!key,
-        maskedKey: maskSecret(key),
-        model: settings.models[p.id] || p.defaultModel,
-        custom: customIds.has(p.id),
-        baseUrl: baseUrlById.get(p.id),
-      };
-    }),
+    fallbackId,
+    providers,
     hasLatexCv: !!settings.latexTemplates.cv,
     hasLatexCover: !!settings.latexTemplates.cover,
   };
@@ -121,7 +126,7 @@ export async function removeCustomProvider(userId: string, id: ProviderId): Prom
   delete settings.apiKeys[id];
   delete settings.models[id];
   // If the removed provider was active, fall back to the default built-in.
-  if (settings.activeProvider === id) settings.activeProvider = 'grok';
+  if (settings.activeProvider === id) settings.activeProvider = 'groq';
   return toView(await save(settings));
 }
 

@@ -29,7 +29,7 @@ export async function register(email: string, password: string): Promise<AuthRes
   };
   await db.users.create(user);
 
-  // Seed empty profile + default settings (Grok active) for the new user.
+  // Seed empty profile + default settings (Groq active) for the new user.
   await db.profiles.upsert(emptyProfile(user.id));
   await db.settings.upsert(defaultSettings(user.id));
 

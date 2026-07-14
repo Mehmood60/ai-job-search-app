@@ -3,13 +3,14 @@ import { decryptSecret } from '../crypto/secrets';
 import { AppError } from '../http/errors';
 import { AIProvider, CompleteOptions, openAiCompatibleComplete } from './provider';
 import { claudeProvider } from './claude';
-import { grokProvider } from './grok';
 import { groqProvider } from './groq';
+import { nvidiaProvider } from './nvidia';
 import { openaiProvider } from './openai';
 
-// Built-in providers, in fallback-preference order (free ones first).
+// Built-in providers, in fallback-preference order: NVIDIA (strong DeepSeek) preferred
+// over Groq as the automatic fallback, then OpenAI / Claude.
 export const BUILTIN_PROVIDERS: AIProvider[] = [
-  grokProvider,
+  nvidiaProvider,
   groqProvider,
   openaiProvider,
   claudeProvider,
@@ -100,7 +101,7 @@ export async function completeWithSettings(
   if (!primary) {
     throw new AppError(
       400,
-      'No AI provider configured. Add an API key in Settings (Grok, Groq, ChatGPT, Claude, or a custom model).',
+      'No AI provider configured. Add an API key in Settings (Groq, ChatGPT, Claude, or a custom model).',
       'NO_PROVIDER',
     );
   }

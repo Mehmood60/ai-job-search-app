@@ -1,6 +1,6 @@
 // Domain models shared across the JSON and Postgres data layers.
 
-// Provider ids are dynamic: the built-ins ('grok' | 'groq' | 'openai' | 'claude')
+// Provider ids are dynamic: the built-ins ('groq' | 'openai' | 'claude')
 // plus any user-defined custom provider ids. Kept as a string alias for clarity.
 export type ProviderId = string;
 
@@ -104,7 +104,7 @@ export function emptyProfile(userId: string): Profile {
 export function defaultSettings(userId: string): Settings {
   return {
     userId,
-    activeProvider: 'grok', // Grok is the default provider slot
+    activeProvider: 'groq', // Groq is the default provider slot + automatic fallback
     apiKeys: {},
     models: {},
     customProviders: [],

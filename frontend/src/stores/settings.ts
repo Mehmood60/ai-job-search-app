@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api } from '../api/client';
 
-// Provider ids are dynamic: built-ins ('grok' | 'groq' | 'openai' | 'claude') plus
+// Provider ids are dynamic: built-ins ('groq' | 'openai' | 'claude') plus
 // user-defined custom provider ids.
 export type ProviderId = string;
 
@@ -19,6 +19,7 @@ export interface ProviderView {
 
 export interface SettingsView {
   activeProvider: ProviderId;
+  fallbackId?: ProviderId;
   providers: ProviderView[];
   hasLatexCv: boolean;
   hasLatexCover: boolean;

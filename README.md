@@ -2,7 +2,7 @@
 
 A deployable web app that turns the AI job-search assistant into a real product:
 **Node.js + Express backend** and a **Vue 3 frontend**, with pluggable AI providers
-(**Grok**, **ChatGPT**, **Claude**), a **JSON datastore that swaps to PostgreSQL**
+(**Groq**, **ChatGPT**, **Claude**, + any OpenAI-compatible model), a **JSON datastore that swaps to PostgreSQL**
 with no feature-code changes, and Docker-first deployment.
 
 > This folder is a superset of the original Claude Code workspace. The workspace
@@ -26,17 +26,18 @@ profile, settings, and (encrypted) API keys are persisted.
 
 ## Multi-provider AI
 
-- The app ships with **Grok** as the default provider slot and the fallback secondary.
+- The app ships with **Groq** as the default provider slot and the automatic fallback secondary.
 - Add an API key for **any** provider in **Settings**; the one you activate becomes the
-  **primary**, with Grok as the automatic fallback. Switch the primary any time.
-- Providers and default models:
+  **primary**, with Groq as the automatic fallback. Switch the primary any time.
+- Built-in providers and default models:
   | Provider | Default model | API |
   |---|---|---|
-  | Grok (x.ai) | `grok-2-latest` | OpenAI-compatible |
+  | Groq (LLaMA) | `llama-3.1-8b-instant` | OpenAI-compatible |
   | ChatGPT (OpenAI) | `gpt-4o` | OpenAI |
   | Claude (Anthropic) | `claude-opus-4-8` | official `@anthropic-ai/sdk` |
+- Plus **Add new model** for any OpenAI-compatible endpoint (Gemini, Cerebras, OpenRouter, DeepSeek, local LLMs, …).
 - **The app ships with no keys** — add at least one in Settings for AI features to work
-  (Grok's API is not literally free; it just occupies the default slot).
+  (Groq offers a free tier — get a `gsk_` key at console.groq.com).
 - Keys are **encrypted at rest** (AES-256-GCM via `APP_SECRET`) and never returned to the browser.
 
 ## PDF generation (dual pipeline)
@@ -123,7 +124,7 @@ git push -u origin main
 backend/   Express + TypeScript
   src/config      env loading/validation (zod)
   src/db          repository interfaces + json/ and postgres/ (Prisma) implementations
-  src/ai          AIProvider interface + grok/openai/claude + registry (primary+fallback)
+  src/ai          AIProvider interface + groq/openai/claude + registry (primary+fallback)
   src/auth        register/login, JWT, bcrypt, auth middleware
   src/crypto      AES-256-GCM for API keys at rest
   src/prompts     system/user prompts (ported from the workspace skills)

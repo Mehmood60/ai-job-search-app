@@ -18,8 +18,6 @@ interface AtsResult {
   recommendations: string[];
   redFlags: string[];
 }
-type Fmt = 'latex' | 'markdown';
-
 const company = ref('');
 const jobInput = ref(''); // pasted JD text OR a URL
 const jobText = ref(''); // server-resolved JD text (reused across steps)
@@ -28,9 +26,9 @@ const evalResult = ref<EvalResult | null>(null);
 const evalProvider = ref('');
 
 const cv = ref('');
-const cvFormat = ref<Fmt>('markdown');
 const coverLetter = ref('');
-const coverFormat = ref<Fmt>('markdown');
+const cvFormat = ref('markdown'); // 'latex' when tailored from a saved template
+const coverFormat = ref('markdown');
 const ats = ref<AtsResult | null>(null);
 const usedProvider = ref('');
 
@@ -39,6 +37,38 @@ const loading = ref('');
 const error = ref('');
 const cvError = ref('');
 const coverError = ref('');
+
+// Rendered PDF previews (blob URLs) + whether the editor is shown.
+const cvPdfUrl = ref('');
+const coverPdfUrl = ref('');
+const showEditor = ref(false);
+
+function revokePreviews() {
+  if (cvPdfUrl.value) URL.revokeObjectURL(cvPdfUrl.value);
+  if (coverPdfUrl.value) URL.revokeObjectURL(coverPdfUrl.value);
+  cvPdfUrl.value = '';
+  coverPdfUrl.value = '';
+}
+
+function b64ToBlobUrl(b64: string): string {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+}
+
+async function loadPreview() {
+  if (!cv.value || !coverLetter.value) return;
+  const { data } = await api.post('/package/preview', {
+    cv: cv.value,
+    coverLetter: coverLetter.value,
+    cvFormat: cvFormat.value,
+    coverFormat: coverFormat.value,
+  });
+  revokePreviews();
+  cvPdfUrl.value = b64ToBlobUrl(data.cvPdf);
+  coverPdfUrl.value = b64ToBlobUrl(data.coverPdf);
+}
 
 function reset() {
   company.value = '';
@@ -55,6 +85,8 @@ function reset() {
   error.value = '';
   cvError.value = '';
   coverError.value = '';
+  revokePreviews();
+  showEditor.value = false;
 }
 
 async function evaluate() {
@@ -90,7 +122,7 @@ function retryAfterSeconds(msg: string): number | null {
   return total > 0 ? Math.ceil(total) + 1 : null;
 }
 
-async function withRetry(label: string, fn: () => Promise<void>, maxRetries = 2): Promise<void> {
+async function withRetry(label: string, fn: () => Promise<void>, maxRetries = 1): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     try {
       await fn();
@@ -157,6 +189,12 @@ async function generate() {
   }
   stage.value = 'review';
   if (cv.value && coverLetter.value) {
+    loading.value = 'Rendering PDF preview…';
+    try {
+      await loadPreview();
+    } catch (e) {
+      error.value = apiError(e);
+    }
     loading.value = 'Running ATS review…';
     try {
       await runAts();
@@ -165,6 +203,20 @@ async function generate() {
     }
   }
   loading.value = '';
+}
+
+// Re-render the PDF preview (and ATS) after the user edits the Markdown.
+async function refreshAfterEdit() {
+  error.value = '';
+  loading.value = 'Re-rendering preview…';
+  try {
+    await loadPreview();
+    await runAts().catch(() => undefined);
+  } catch (e) {
+    error.value = apiError(e);
+  } finally {
+    loading.value = '';
+  }
 }
 
 async function regenerate(kind: 'cv' | 'cover') {
@@ -177,18 +229,6 @@ async function regenerate(kind: 'cv' | 'cover') {
   } catch (e) {
     if (kind === 'cv') cvError.value = apiError(e);
     else coverError.value = apiError(e);
-  } finally {
-    loading.value = '';
-  }
-}
-
-async function reReview() {
-  error.value = '';
-  loading.value = 'Running ATS review…';
-  try {
-    await runAts(); // withRetry: counts down + retries on rate limit
-  } catch (e) {
-    error.value = apiError(e);
   } finally {
     loading.value = '';
   }
@@ -231,6 +271,10 @@ const fitColor = (v: string) =>
 const atsColor = (v: string) =>
   ({ excellent: 'text-green-600', good: 'text-green-600', 'needs-work': 'text-amber-600', poor: 'text-brand' }[v] ||
   'text-gray-600');
+
+// Detect provider free-tier/quota/rate errors so we can show helpful guidance.
+const isLimitError = (msg: string) =>
+  /resourceexhausted|resource exhausted|limit reached|rate limit|quota|429|exhausted|too many/i.test(msg || '');
 </script>
 
 <template>
@@ -239,7 +283,22 @@ const atsColor = (v: string) =>
     <button v-if="stage !== 'input'" class="btn-ghost" :disabled="!!loading" @click="reset">Start over</button>
   </div>
 
-  <p v-if="error" class="mb-4 text-sm text-brand">{{ error }}</p>
+  <!-- Progress indicator — always visible while something is running -->
+  <div
+    v-if="loading"
+    class="mb-4 flex items-center gap-3 rounded-md border border-brand/30 bg-brand/5 px-4 py-3 text-sm font-medium text-brand"
+  >
+    <span class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand border-t-transparent"></span>
+    <span>{{ loading }}</span>
+  </div>
+
+  <div v-if="error" class="mb-4 rounded-md border border-brand/30 bg-brand/5 px-4 py-3 text-sm">
+    <p class="text-brand">{{ error }}</p>
+    <p v-if="isLimitError(error)" class="mt-1 text-xs text-gray-500">
+      This provider hit its free-tier limit. Wait a few minutes, switch/add a provider in Settings, or use a paid key
+      for no limits.
+    </p>
+  </div>
 
   <div class="space-y-6">
     <!-- Step 1: job input + evaluate -->
@@ -299,8 +358,8 @@ const atsColor = (v: string) =>
           {{ loading || 'Generate CV & Cover letter for this job' }}
         </button>
         <p class="mt-2 text-xs text-gray-400">
-          Tailors a copy of your saved CV/cover templates to this posting — nothing is shortened, and your original
-          templates are never changed.
+          Generates a tailored CV & cover letter from your profile for this posting — nothing is shortened — then
+          renders both to PDF for you to preview before downloading.
         </p>
       </div>
     </div>
@@ -338,39 +397,60 @@ const atsColor = (v: string) =>
 
         <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
           <p class="mr-auto text-sm text-gray-500">
-            Happy with this? Download the ZIP (JD + CV + cover letter, PDF and tailored .tex). Nothing is stored on the
-            server.
+            Happy with the preview below? Download the ZIP (JD + both PDFs). Nothing is stored on the server.
           </p>
-          <button class="btn-ghost" :disabled="!!loading" @click="reset">Discard</button>
+          <button class="btn-ghost" :disabled="!!loading" @click="reset">Reject</button>
           <button class="btn-primary" :disabled="!!loading || !cv || !coverLetter" @click="download">
             {{ loading || 'Download ZIP' }}
           </button>
         </div>
-        <p v-if="(!cv || !coverLetter) && !loading" class="mt-2 text-xs text-amber-600">
-          Download needs both documents — retry the missing one below.
-        </p>
       </div>
 
-      <div class="grid gap-6 md:grid-cols-2">
-        <div class="card">
-          <div class="mb-1 flex items-center justify-between">
-            <label class="label mb-0">CV — editable ({{ cvFormat === 'latex' ? 'tailored LaTeX' : 'Markdown' }})</label>
-            <button v-if="cvError || !cv" class="btn-ghost text-xs" :disabled="!!loading" @click="regenerate('cv')">Retry CV</button>
-          </div>
-          <p v-if="cvError" class="mb-2 text-xs text-brand">{{ cvError }}</p>
-          <textarea v-model="cv" rows="20" class="input resize-y font-mono text-xs" />
+      <!-- Retry banners if a document failed to generate -->
+      <div v-if="cvError || coverError" class="flex flex-wrap gap-3">
+        <div v-if="cvError" class="card flex-1 border-brand/30">
+          <p class="text-sm text-brand">CV: {{ cvError }}</p>
+          <p v-if="isLimitError(cvError)" class="mt-1 text-xs text-gray-500">Free-tier limit hit — wait a few minutes or switch provider in Settings.</p>
+          <button class="btn-ghost mt-2" :disabled="!!loading" @click="regenerate('cv')">Retry CV</button>
         </div>
-        <div class="card">
-          <div class="mb-1 flex items-center justify-between">
-            <label class="label mb-0">Cover letter — editable ({{ coverFormat === 'latex' ? 'tailored LaTeX' : 'Markdown' }})</label>
-            <button v-if="coverError || !coverLetter" class="btn-ghost text-xs" :disabled="!!loading" @click="regenerate('cover')">Retry cover letter</button>
-          </div>
-          <p v-if="coverError" class="mb-2 text-xs text-brand">{{ coverError }}</p>
-          <textarea v-model="coverLetter" rows="20" class="input resize-y font-mono text-xs" />
+        <div v-if="coverError" class="card flex-1 border-brand/30">
+          <p class="text-sm text-brand">Cover letter: {{ coverError }}</p>
+          <p v-if="isLimitError(coverError)" class="mt-1 text-xs text-gray-500">Free-tier limit hit — wait a few minutes or switch provider in Settings.</p>
+          <button class="btn-ghost mt-2" :disabled="!!loading" @click="regenerate('cover')">Retry cover letter</button>
         </div>
       </div>
-      <div class="flex justify-end">
-        <button class="btn-ghost" :disabled="!!loading" @click="reReview">Re-run ATS review after edits</button>
+
+      <!-- PDF previews -->
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class="card">
+          <h3 class="mb-2 font-semibold">CV preview</h3>
+          <iframe v-if="cvPdfUrl" :src="cvPdfUrl" class="h-[75vh] w-full rounded border border-gray-200" title="CV preview" />
+          <p v-else class="text-sm text-gray-400">No preview yet — generate or retry the CV.</p>
+        </div>
+        <div class="card">
+          <h3 class="mb-2 font-semibold">Cover letter preview</h3>
+          <iframe v-if="coverPdfUrl" :src="coverPdfUrl" class="h-[75vh] w-full rounded border border-gray-200" title="Cover letter preview" />
+          <p v-else class="text-sm text-gray-400">No preview yet — generate or retry the cover letter.</p>
+        </div>
+      </div>
+
+      <!-- Optional inline editing of the underlying content -->
+      <div class="card">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Edit content (optional)</h3>
+          <button class="btn-ghost" @click="showEditor = !showEditor">{{ showEditor ? 'Hide editor' : 'Edit text' }}</button>
+        </div>
+        <div v-if="showEditor" class="mt-4 space-y-4">
+          <div>
+            <label class="label">CV (Markdown)</label>
+            <textarea v-model="cv" rows="16" class="input resize-y font-mono text-xs" />
+          </div>
+          <div>
+            <label class="label">Cover letter (Markdown)</label>
+            <textarea v-model="coverLetter" rows="14" class="input resize-y font-mono text-xs" />
+          </div>
+          <button class="btn-primary" :disabled="!!loading" @click="refreshAfterEdit">Update preview & ATS</button>
+        </div>
       </div>
     </template>
   </div>
