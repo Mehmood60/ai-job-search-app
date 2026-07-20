@@ -1,6 +1,4 @@
 import archiver from 'archiver';
-import { existsSync } from 'fs';
-import path from 'path';
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../http/errors';
@@ -8,6 +6,7 @@ import { requireAuth } from '../../auth/middleware';
 import { loadProfile } from '../userData';
 import { markdownToPdf } from '../../pdf/html';
 import { compileTectonic } from '../../pdf/tectonic';
+import { findAsset } from '../../pdf/assets';
 
 const router = Router();
 router.use(requireAuth);
@@ -21,23 +20,7 @@ const previewBody = z.object({
 });
 const zipBody = previewBody.extend({
   jobText: z.string().min(1),
-  company: z.string().default('Company'),
 });
-
-function sanitize(s: string): string {
-  return s.replace(/[^\w.\- ]+/g, '').trim() || 'Company';
-}
-
-// Locate a template asset (e.g. the CV headshot) across likely repo layouts.
-function findAsset(name: string): string | null {
-  const candidates = [
-    path.resolve(process.cwd(), '..', 'cv', name),
-    path.resolve(process.cwd(), 'cv', name),
-    path.resolve(__dirname, '../../../../cv', name),
-    path.resolve(__dirname, '../../../cv', name),
-  ];
-  return candidates.find((c) => existsSync(c)) ?? null;
-}
 
 // Render one document to a PDF Buffer. LaTeX → Tectonic (CV gets its headshot);
 // Markdown → Chromium HTML→PDF.
@@ -76,17 +59,16 @@ router.post(
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { jobText, cv, coverLetter, company, cvFormat, coverFormat } = zipBody.parse(req.body);
+    const { jobText, cv, coverLetter, cvFormat, coverFormat } = zipBody.parse(req.body);
     const profile = await loadProfile(req.userId!);
     const name = (profile.fullName || 'Candidate').trim();
-    const companyClean = sanitize(company);
 
     const [cvPdf, coverPdf] = await Promise.all([
       renderDoc('cv', cv, cvFormat, `${name} — CV`),
       renderDoc('cover', coverLetter, coverFormat, `${name} — Cover Letter`),
     ]);
 
-    const zipName = `${name} - ${companyClean} - Application.zip`;
+    const zipName = `${name} - Application.zip`;
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipName.replace(/"/g, '')}"`);
 
@@ -98,8 +80,8 @@ router.post(
     });
     archive.pipe(res);
     archive.append(jobText, { name: 'job_description.txt' });
-    archive.append(cvPdf, { name: `${name} - CV - ${companyClean}.pdf` });
-    archive.append(coverPdf, { name: `${name} - Cover Letter - ${companyClean}.pdf` });
+    archive.append(cvPdf, { name: `${name} - CV.pdf` });
+    archive.append(coverPdf, { name: `${name} - Cover Letter.pdf` });
     await archive.finalize();
   }),
 );

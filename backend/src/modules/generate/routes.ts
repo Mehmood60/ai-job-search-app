@@ -29,7 +29,11 @@ router.use(requireAuth);
 router.use(aiLimiter); // throttle paid AI calls (cost-abuse protection)
 
 // jobText may be a pasted description OR a URL (resolved server-side).
-const jobBody = z.object({ jobText: z.string().min(1, 'Paste a job posting or a link') });
+// userNotes: optional candidate-provided facts to factor in / address gaps.
+const jobBody = z.object({
+  jobText: z.string().min(1, 'Paste a job posting or a link'),
+  userNotes: z.string().optional(),
+});
 const atsBody = z.object({
   jobText: z.string().min(1),
   cv: z.string().min(1),
@@ -72,6 +76,7 @@ async function generateDoc(
   userId: string,
   kind: DocKind,
   rawJobText: string,
+  userNotes?: string,
 ): Promise<{ content: string; format: 'latex' | 'markdown'; usedProvider: string; jobText: string }> {
   const jobText = await resolveJobText(rawJobText);
   const [profile, settings] = await Promise.all([loadProfile(userId), loadSettings(userId)]);
@@ -79,6 +84,7 @@ async function generateDoc(
   // Fetched postings (esp. LinkedIn) carry a lot of boilerplate; cap to keep the
   // request within provider token limits. The essential JD text fits easily.
   const jd = jobText.slice(0, 6000);
+  const notes = userNotes?.slice(0, 2000);
   const template = kind === 'cv' ? settings.latexTemplates.cv : settings.latexTemplates.cover;
 
   if (template && template.trim()) {
@@ -88,7 +94,7 @@ async function generateDoc(
     const maxTokens = kind === 'cv' ? 8000 : 6000;
     const { text, usedProvider } = await completeWithSettings(settings, {
       system: kind === 'cv' ? TAILOR_CV_SYSTEM : TAILOR_COVER_SYSTEM,
-      user: tailorUser(template, jd),
+      user: tailorUser(template, jd, notes),
       maxTokens,
       temperature: 0.2, // faithful to the original — minimise fabrication
     });
@@ -98,7 +104,7 @@ async function generateDoc(
   // No saved template → generate tailored Markdown (rendered via Chromium HTML→PDF).
   const { text, usedProvider } = await completeWithSettings(settings, {
     system: kind === 'cv' ? CV_SYSTEM : COVER_SYSTEM,
-    user: kind === 'cv' ? cvUser(profileText, jd) : coverUser(profileText, jd),
+    user: kind === 'cv' ? cvUser(profileText, jd, notes) : coverUser(profileText, jd, notes),
     maxTokens: 4096,
     temperature: 0.3,
   });
@@ -110,12 +116,12 @@ async function generateDoc(
 router.post(
   '/evaluate',
   asyncHandler(async (req, res) => {
-    const { jobText: raw } = jobBody.parse(req.body);
+    const { jobText: raw, userNotes } = jobBody.parse(req.body);
     const jobText = await resolveJobText(raw);
     const [profile, settings] = await Promise.all([loadProfile(req.userId!), loadSettings(req.userId!)]);
     const { result, usedProvider } = await completeJson(settings, {
       system: EVALUATE_SYSTEM,
-      user: evaluateUser(profileToText(profile), jobText.slice(0, 6000)),
+      user: evaluateUser(profileToText(profile), jobText.slice(0, 6000), userNotes?.slice(0, 2000)),
       maxTokens: 4096, // headroom for "thinking" models (e.g. Gemini) so JSON isn't starved
       json: true,
     });
@@ -127,8 +133,8 @@ router.post(
 router.post(
   '/generate/cv',
   asyncHandler(async (req, res) => {
-    const { jobText } = jobBody.parse(req.body);
-    const doc = await generateDoc(req.userId!, 'cv', jobText);
+    const { jobText, userNotes } = jobBody.parse(req.body);
+    const doc = await generateDoc(req.userId!, 'cv', jobText, userNotes);
     res.json({ cv: doc.content, format: doc.format, usedProvider: doc.usedProvider, jobText: doc.jobText });
   }),
 );
@@ -137,8 +143,8 @@ router.post(
 router.post(
   '/generate/cover-letter',
   asyncHandler(async (req, res) => {
-    const { jobText } = jobBody.parse(req.body);
-    const doc = await generateDoc(req.userId!, 'cover', jobText);
+    const { jobText, userNotes } = jobBody.parse(req.body);
+    const doc = await generateDoc(req.userId!, 'cover', jobText, userNotes);
     res.json({
       coverLetter: doc.content,
       format: doc.format,

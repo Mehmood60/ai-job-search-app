@@ -46,11 +46,24 @@ export async function openAiCompatibleComplete(
   let res: Response;
   // Retry transient upstream errors (502/503/504 — gateway/timeout blips) once.
   for (let attempt = 0; ; attempt++) {
-    res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body,
-    });
+    try {
+      res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body,
+        signal: AbortSignal.timeout(60_000), // don't hang forever on a stalled provider/proxy
+      });
+    } catch (e) {
+      const err = e as Error;
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        throw new AppError(
+          504,
+          'The AI provider took too long to respond (60s). Try again, or switch provider in Settings.',
+          'TIMEOUT',
+        );
+      }
+      throw new AppError(502, `Could not reach the AI provider: ${err.message}`, 'NETWORK');
+    }
     if (res.ok || res.status < 500 || attempt >= 1) break;
     await sleep(2000);
   }

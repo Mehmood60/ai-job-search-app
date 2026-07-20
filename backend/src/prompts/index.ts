@@ -123,6 +123,7 @@ WHAT YOU MAY DO (only this):
 - Rephrase the summary/profile and headline using ONLY words and skills already present in the document, to foreground the genuinely-relevant experience.
 - Reorder existing skills/bullets so the most relevant TRUE ones appear first.
 - Adjust tone/wording. You may name the target company in the summary as an aspiration (e.g. "eager to contribute to <Company>").
+- EXCEPTION — CANDIDATE'S ADDITIONAL NOTES: if a "CANDIDATE'S ADDITIONAL NOTES" section is provided, you MAY add the facts, skills, experience, or availability stated there (the candidate asserts they are true), weaving them in naturally to address the posting. Those notes are the ONLY permitted source of additions beyond the original document.
 
 Preserve the document's format exactly. If it is LaTeX, return valid LaTeX with the SAME preamble, packages, structure, environments, and commands; keep image/graphics commands intact.
 Return ONLY the complete tailored document. No markdown code fences, no commentary before or after.`;
@@ -130,8 +131,28 @@ Return ONLY the complete tailored document. No markdown code fences, no commenta
 export const TAILOR_CV_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's CV/résumé.`;
 export const TAILOR_COVER_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's cover letter. Also update the addressed company/role and the specific hook to fit this posting, keeping the same overall length and structure.`;
 
-export function tailorUser(originalDoc: string, jobText: string): string {
-  return `TARGET JOB POSTING:\n${jobText}\n\nORIGINAL DOCUMENT TO TAILOR (return a tailored copy in the SAME format, changing only wording/keywords):\n${originalDoc}`;
+// Candidate-provided notes block (true facts the profile/CV may have missed).
+function notesBlock(notes?: string): string {
+  return notes && notes.trim()
+    ? `\n\nCANDIDATE'S ADDITIONAL NOTES (provided by the candidate — treat as TRUE; use to address gaps and strengthen the match, e.g. a genuinely-held skill/experience the profile omitted, or updated availability/relocation):\n${notes.trim()}`
+    : '';
+}
+
+export function tailorUser(originalDoc: string, jobText: string, notes?: string): string {
+  return `TARGET JOB POSTING:\n${jobText}${notesBlock(notes)}\n\nORIGINAL DOCUMENT TO TAILOR (return a tailored copy in the SAME format, changing only wording/keywords and weaving in any notes above where they genuinely strengthen the match):\n${originalDoc}`;
+}
+
+// Edit the user's MASTER template (CV or cover) per a natural-language instruction.
+export const EDIT_TEMPLATE_SYSTEM = `You edit a LaTeX document according to the user's instruction. This is the user's master template, so precision matters.
+RULES:
+- Apply ONLY the requested change (add / update / remove exactly what the instruction says).
+- Preserve EVERYTHING else exactly: same \\documentclass, preamble, packages, colors, layout, commands, and all other sections and their content. Do not shorten, reword, reorder, or drop anything that the instruction doesn't mention.
+- When adding content, match the document's existing formatting/commands and place it where the instruction says (e.g. a new entry in the "Selected Project" section).
+- Keep the output as valid, compilable LaTeX (balanced braces/environments; don't add packages unless strictly required by the requested change).
+Return ONLY the complete updated LaTeX document — no markdown code fences, no commentary before or after.`;
+
+export function editTemplateUser(instruction: string, doc: string): string {
+  return `INSTRUCTION:\n${instruction}\n\nCURRENT DOCUMENT (return the full document with the instruction applied):\n${doc}`;
 }
 
 // ── User-prompt builders ──
@@ -140,17 +161,16 @@ export function extractProfileUser(cvText: string): string {
   return `CV SOURCE:\n${cvText}\n\nExtract the candidate profile and return the JSON.`;
 }
 
-
-export function evaluateUser(profileText: string, jobText: string): string {
-  return `CANDIDATE PROFILE:\n${profileText}\n\nJOB POSTING:\n${jobText}\n\nAssess the fit and return the JSON.`;
+export function evaluateUser(profileText: string, jobText: string, notes?: string): string {
+  return `CANDIDATE PROFILE:\n${profileText}${notesBlock(notes)}\n\nJOB POSTING:\n${jobText}\n\nAssess the fit (factoring in the notes as true) and return the JSON.`;
 }
 
-export function cvUser(profileText: string, jobText: string): string {
-  return `CANDIDATE PROFILE:\n${profileText}\n\nTARGET JOB POSTING:\n${jobText}\n\nWrite the tailored CV now.`;
+export function cvUser(profileText: string, jobText: string, notes?: string): string {
+  return `CANDIDATE PROFILE:\n${profileText}${notesBlock(notes)}\n\nTARGET JOB POSTING:\n${jobText}\n\nWrite the tailored CV now.`;
 }
 
-export function coverUser(profileText: string, jobText: string): string {
-  return `CANDIDATE PROFILE:\n${profileText}\n\nTARGET JOB POSTING:\n${jobText}\n\nWrite the tailored cover letter now.`;
+export function coverUser(profileText: string, jobText: string, notes?: string): string {
+  return `CANDIDATE PROFILE:\n${profileText}${notesBlock(notes)}\n\nTARGET JOB POSTING:\n${jobText}\n\nWrite the tailored cover letter now.`;
 }
 
 export function atsUser(jobText: string, cv: string, coverLetter: string): string {

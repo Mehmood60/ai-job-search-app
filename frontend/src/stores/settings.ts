@@ -70,6 +70,13 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value = data;
   }
 
+  // Edit the saved template via a natural-language instruction. Returns the edited
+  // LaTeX for review (not saved until setLatexTemplate is called).
+  async function editTemplate(kind: 'cv' | 'cover', instruction: string): Promise<string> {
+    const { data } = await api.post<{ template: string }>('/settings/template-edit', { kind, instruction });
+    return data.template;
+  }
+
   return {
     settings,
     load,
@@ -79,5 +86,6 @@ export const useSettingsStore = defineStore('settings', () => {
     addCustomProvider,
     removeCustomProvider,
     setLatexTemplate,
+    editTemplate,
   };
 });

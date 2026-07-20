@@ -24,7 +24,7 @@ const links = [
 <template>
   <div class="min-h-screen">
     <header v-if="showNav" class="border-b border-gray-200 bg-white">
-      <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div class="flex items-center gap-6">
           <span class="text-lg font-bold text-brand">AI Job Search</span>
           <nav class="flex gap-1">
@@ -45,7 +45,7 @@ const links = [
       </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-4 py-8">
+    <main class="mx-auto max-w-7xl px-4 py-8">
       <RouterView />
     </main>
   </div>

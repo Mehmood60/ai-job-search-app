@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { api, apiError } from '../api/client';
 
 interface EvalResult {
@@ -18,9 +18,10 @@ interface AtsResult {
   recommendations: string[];
   redFlags: string[];
 }
-const company = ref('');
 const jobInput = ref(''); // pasted JD text OR a URL
 const jobText = ref(''); // server-resolved JD text (reused across steps)
+const userNotes = ref(''); // candidate notes to address gaps (treated as true facts)
+const showNotes = ref(false);
 
 const evalResult = ref<EvalResult | null>(null);
 const evalProvider = ref('');
@@ -42,6 +43,17 @@ const coverError = ref('');
 const cvPdfUrl = ref('');
 const coverPdfUrl = ref('');
 const showEditor = ref(false);
+
+// Live activity log (terminal-style) so the user sees what's happening.
+const logs = ref<string[]>([]);
+const logEl = ref<HTMLElement | null>(null);
+function log(msg: string) {
+  const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  logs.value.push(`${t}  ${msg}`);
+  nextTick(() => {
+    if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight;
+  });
+}
 
 function revokePreviews() {
   if (cvPdfUrl.value) URL.revokeObjectURL(cvPdfUrl.value);
@@ -71,9 +83,10 @@ async function loadPreview() {
 }
 
 function reset() {
-  company.value = '';
   jobInput.value = '';
   jobText.value = '';
+  userNotes.value = '';
+  showNotes.value = false;
   evalResult.value = null;
   cv.value = '';
   coverLetter.value = '';
@@ -87,21 +100,31 @@ function reset() {
   coverError.value = '';
   revokePreviews();
   showEditor.value = false;
+  logs.value = [];
 }
 
 async function evaluate() {
   error.value = '';
+  logs.value = [];
+  const isUrl = /^https?:\/\//i.test(jobInput.value.trim());
+  log(isUrl ? '→ Fetching job posting from link…' : '→ Reading job posting…');
   loading.value = 'Reading the posting and evaluating fit…';
   try {
+    log('→ Evaluating fit against your profile…');
     await withRetry('Evaluate', async () => {
-      const { data } = await api.post('/evaluate', { jobText: jobInput.value });
+      const { data } = await api.post('/evaluate', {
+        jobText: jobInput.value,
+        userNotes: userNotes.value || undefined,
+      });
       evalResult.value = data.result;
       evalProvider.value = data.usedProvider;
       jobText.value = data.jobText; // resolved (URL fetched server-side, if any)
     });
+    log(`✓ Fit evaluated — score ${evalResult.value?.score}/100 (via ${evalProvider.value})`);
     stage.value = 'evaluated';
   } catch (e) {
     error.value = apiError(e);
+    log(`✗ ${apiError(e)}`);
   } finally {
     loading.value = '';
   }
@@ -130,6 +153,7 @@ async function withRetry(label: string, fn: () => Promise<void>, maxRetries = 1)
     } catch (e) {
       const wait = retryAfterSeconds(apiError(e));
       if (wait != null && attempt < maxRetries) {
+        log(`⏳ ${label}: provider rate limit — waiting ${wait}s then retrying…`);
         for (let s = wait; s > 0; s--) {
           loading.value = `${label}: provider rate limit — retrying in ${s}s…`;
           await sleep(1000);
@@ -144,7 +168,10 @@ async function withRetry(label: string, fn: () => Promise<void>, maxRetries = 1)
 async function genCv() {
   cvError.value = '';
   await withRetry('CV', async () => {
-    const { data } = await api.post('/generate/cv', { jobText: jobText.value });
+    const { data } = await api.post('/generate/cv', {
+      jobText: jobText.value,
+      userNotes: userNotes.value || undefined,
+    });
     cv.value = data.cv;
     cvFormat.value = data.format;
     usedProvider.value = data.usedProvider;
@@ -154,7 +181,10 @@ async function genCv() {
 async function genCover() {
   coverError.value = '';
   await withRetry('Cover letter', async () => {
-    const { data } = await api.post('/generate/cover-letter', { jobText: jobText.value });
+    const { data } = await api.post('/generate/cover-letter', {
+      jobText: jobText.value,
+      userNotes: userNotes.value || undefined,
+    });
     coverLetter.value = data.coverLetter;
     coverFormat.value = data.format;
   });
@@ -176,32 +206,44 @@ async function runAts() {
 async function generate() {
   error.value = '';
   loading.value = 'Tailoring your CV…';
+  log('→ Tailoring your CV to this posting…');
   try {
     await genCv();
+    log(`✓ CV tailored (via ${usedProvider.value})`);
   } catch (e) {
     cvError.value = apiError(e);
+    log(`✗ CV: ${apiError(e)}`);
   }
   loading.value = 'Tailoring your cover letter…';
+  log('→ Tailoring your cover letter…');
   try {
     await genCover();
+    log('✓ Cover letter tailored');
   } catch (e) {
     coverError.value = apiError(e);
+    log(`✗ Cover letter: ${apiError(e)}`);
   }
   stage.value = 'review';
   if (cv.value && coverLetter.value) {
     loading.value = 'Rendering PDF preview…';
+    log('→ Rendering PDFs…');
     try {
       await loadPreview();
+      log('✓ PDFs rendered');
     } catch (e) {
       error.value = apiError(e);
+      log(`✗ Render: ${apiError(e)}`);
     }
     loading.value = 'Running ATS review…';
+    log('→ Running ATS review…');
     try {
       await runAts();
+      log('✓ ATS review complete');
     } catch {
-      /* ATS is optional; ignore */
+      log('• ATS review skipped');
     }
   }
+  log('✓ Done — review your documents below');
   loading.value = '';
 }
 
@@ -244,7 +286,6 @@ async function download() {
         jobText: jobText.value,
         cv: cv.value,
         coverLetter: coverLetter.value,
-        company: company.value,
         cvFormat: cvFormat.value,
         coverFormat: coverFormat.value,
       },
@@ -253,8 +294,7 @@ async function download() {
     const url = URL.createObjectURL(res.data as Blob);
     const a = document.createElement('a');
     a.href = url;
-    const name = (company.value || 'Company').replace(/[^\w.\- ]+/g, '').trim() || 'Company';
-    a.download = `${name} - Application.zip`;
+    a.download = 'Application.zip';
     a.click();
     URL.revokeObjectURL(url);
     reset();
@@ -301,30 +341,43 @@ const isLimitError = (msg: string) =>
   </div>
 
   <div class="space-y-6">
-    <!-- Step 1: job input + evaluate -->
-    <div class="card space-y-4">
-      <div>
-        <label class="label">Company name</label>
-        <input v-model="company" class="input" placeholder="e.g. Acme GmbH" :disabled="stage !== 'input'" />
+    <!-- Step 1: job input + evaluate (with live activity log beside it) -->
+    <div class="card">
+      <div class="grid gap-5 lg:grid-cols-5">
+        <!-- Job posting input (full width until activity starts) -->
+        <div :class="logs.length ? 'lg:col-span-3' : 'lg:col-span-5'">
+          <label class="label">Job posting — paste the full description or a link</label>
+          <textarea
+            v-model="jobInput"
+            rows="16"
+            class="input resize-y font-mono text-xs"
+            placeholder="Paste the full job description, or a URL to it (e.g. https://…)"
+            :disabled="stage !== 'input'"
+          />
+          <button
+            v-if="stage === 'input'"
+            class="btn-primary mt-4"
+            :disabled="!!loading || jobInput.trim().length < 5"
+            @click="evaluate"
+          >
+            {{ loading || 'Evaluate fit' }}
+          </button>
+        </div>
+
+        <!-- Activity log — only appears once processing starts -->
+        <div v-if="logs.length" class="lg:col-span-2">
+          <label class="label">Activity</label>
+          <div
+            ref="logEl"
+            class="h-[calc(16rem+2.5rem)] overflow-y-auto rounded-md border border-gray-800 bg-gray-900 p-3 font-mono text-xs leading-relaxed text-green-300"
+          >
+            <p v-for="(line, i) in logs" :key="i" class="whitespace-pre-wrap break-words">{{ line }}</p>
+            <p v-if="loading" class="text-brand">
+              <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-brand"></span> {{ loading }}
+            </p>
+          </div>
+        </div>
       </div>
-      <div>
-        <label class="label">Job posting — paste the full description or a link</label>
-        <textarea
-          v-model="jobInput"
-          rows="10"
-          class="input font-mono text-xs"
-          placeholder="Paste the full job description, or a URL to it (e.g. https://…)"
-          :disabled="stage !== 'input'"
-        />
-      </div>
-      <button
-        v-if="stage === 'input'"
-        class="btn-primary"
-        :disabled="!!loading || jobInput.trim().length < 5"
-        @click="evaluate"
-      >
-        {{ loading || 'Evaluate fit' }}
-      </button>
     </div>
 
     <!-- Step 2: evaluation result + generate button -->
@@ -353,14 +406,39 @@ const isLimitError = (msg: string) =>
         <span v-for="k in evalResult.keywords_missing" :key="k" class="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800">{{ k }}</span>
       </div>
 
-      <div v-if="stage === 'evaluated'" class="mt-6 border-t border-gray-100 pt-4">
-        <button class="btn-primary" :disabled="!!loading" @click="generate">
-          {{ loading || 'Generate CV & Cover letter for this job' }}
-        </button>
-        <p class="mt-2 text-xs text-gray-400">
-          Generates a tailored CV & cover letter from your profile for this posting — nothing is shortened — then
-          renders both to PDF for you to preview before downloading.
-        </p>
+      <div v-if="stage === 'evaluated'" class="mt-6 space-y-4 border-t border-gray-100 pt-4">
+        <!-- User notes to address gaps -->
+        <div>
+          <button class="btn-ghost" @click="showNotes = !showNotes">
+            {{ showNotes ? 'Hide notes' : '+ Add your notes' }}
+          </button>
+          <div v-if="showNotes" class="mt-3">
+            <label class="label">Your notes (optional) — correct or add anything the evaluation missed</label>
+            <textarea
+              v-model="userNotes"
+              rows="4"
+              class="input resize-y"
+              placeholder="e.g. 'I do have IoT/embedded exposure — built multi-user VR (Unity/Photon) and a HoloLens mixed-reality app.' · 'I'm willing to relocate to Munich.' These are treated as true and woven into your CV & cover letter to address the gaps above."
+            />
+            <button
+              class="btn-ghost mt-2"
+              :disabled="!!loading || !userNotes.trim()"
+              @click="evaluate"
+            >
+              Re-evaluate with notes
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <button class="btn-primary" :disabled="!!loading" @click="generate">
+            {{ loading || 'Generate CV & Cover letter for this job' }}
+          </button>
+          <p class="mt-2 text-xs text-gray-400">
+            Generates a tailored CV & cover letter from your profile (and your notes above) for this posting — nothing
+            is shortened — then renders both to PDF to preview before downloading.
+          </p>
+        </div>
       </div>
     </div>
 
