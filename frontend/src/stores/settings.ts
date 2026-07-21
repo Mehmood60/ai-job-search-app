@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia';
+import { acceptHMRUpdate, defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api } from '../api/client';
 
@@ -89,3 +89,8 @@ export const useSettingsStore = defineStore('settings', () => {
     editTemplate,
   };
 });
+
+// Proper HMR for this store — so adding actions doesn't require a full page reload.
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useSettingsStore, import.meta.hot));
+}

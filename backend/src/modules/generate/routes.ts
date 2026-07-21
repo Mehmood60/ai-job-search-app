@@ -15,6 +15,7 @@ import {
   EVALUATE_SYSTEM,
   TAILOR_CV_SYSTEM,
   TAILOR_COVER_SYSTEM,
+  applyLatexPatches,
   atsUser,
   coverUser,
   cvUser,
@@ -88,17 +89,19 @@ async function generateDoc(
   const template = kind === 'cv' ? settings.latexTemplates.cv : settings.latexTemplates.cover;
 
   if (template && template.trim()) {
-    // Tailor a COPY of the user's own LaTeX template — same design/style, only wording
-    // and keywords updated to the JD, nothing shortened. Rendered with Tectonic.
-    // Generous maxTokens: the whole tailored doc + a reasoning model's "thinking".
-    const maxTokens = kind === 'cv' ? 8000 : 6000;
+    // Tailor a COPY of the user's own LaTeX template via small find/replace PATCHES
+    // (headline/summary/keywords) — the layout and all content are preserved byte-for-
+    // byte, so even weak models can't garble or duplicate the document. Rendered with
+    // Tectonic. If no patch matches, the untailored (but valid) template is returned.
     const { text, usedProvider } = await completeWithSettings(settings, {
       system: kind === 'cv' ? TAILOR_CV_SYSTEM : TAILOR_COVER_SYSTEM,
       user: tailorUser(template, jd, notes),
-      maxTokens,
+      maxTokens: 4000, // only small patches are returned, not the whole document
       temperature: 0.2, // faithful to the original — minimise fabrication
+      timeoutMs: 120_000,
     });
-    return { content: stripFence(text), format: 'latex', usedProvider, jobText };
+    const { updated } = applyLatexPatches(template, text);
+    return { content: updated, format: 'latex', usedProvider, jobText };
   }
 
   // No saved template → generate tailored Markdown (rendered via Chromium HTML→PDF).

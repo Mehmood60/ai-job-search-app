@@ -109,27 +109,31 @@ Return strict JSON only (no markdown, no prose outside the JSON) with this exact
   "certifications": [""]
 }`;
 
-// Tailors a COPY of the user's own document (LaTeX or plain text). The original is
-// never modified — we only ask the model to return a tailored copy.
-const TAILOR_RULES = `You tailor an EXISTING job-application document to a job posting. You are given the candidate's own document verbatim and return a tailored COPY. Your ONLY freedom is to rephrase and reorder content that is ALREADY in the document.
+// Shared find/replace PATCH format. We never ask the model to return a whole document
+// (weak models garble/duplicate large LaTeX) or JSON (LaTeX backslashes/newlines break
+// JSON escaping). Instead it returns tiny verbatim patches the server applies — layout
+// is preserved byte-for-byte and only the intended snippets change.
+const PATCH_FORMAT = `Return your changes as MINIMAL find/replace patches — do NOT return the whole document, and do NOT use JSON. For EACH change output a block EXACTLY like this (each @@ marker alone on its own line):
+@@FIND@@
+<a snippet copied VERBATIM from the document — copy its backslashes, braces and line breaks literally; do not escape or reformat>
+@@REPLACE@@
+<the same snippet with only your change applied>
+@@END@@
+Output ONLY these blocks (one per change) — nothing before, between, or after.
+- FIND must be an exact, contiguous copy from the document, long and unique enough to occur exactly once.
+- REPLACE keeps all surrounding content, commands and formatting identical.
+- In any prose you write, escape LaTeX specials: \\& for "&", \\% for "%", \\# for "#", \\_ for "_". Never leave a bare & (it breaks compilation).`;
 
-HARD CONSTRAINTS — breaking ANY of these makes the output unusable and is worse than doing nothing:
-- NEVER add, rename, substitute, imply, or emphasise any technology, framework, tool, library, standard, methodology, certification, employer, title, or domain that is NOT already written verbatim in the original document. Concrete examples of FORBIDDEN edits: if the document says "CakePHP", you may not write "Symfony"; if it does not contain "Kubernetes"/"K8s", you may not add it; if it does not contain "HL7", "FHIR", "Mirth", or "API Platform", you may not add them.
-- Do NOT change the candidate's tech stack, skills list, job titles, employers, dates, or metrics. Every factual claim must stay identical in meaning.
-- If the job requires something the document does not contain, LEAVE IT OUT. Honest gaps MUST remain visible. Never fabricate to close a gap — this is the most important rule.
-- Do NOT shorten, remove, or drop any section, role, bullet, project, or skill. All original content stays.
+const TAILOR_RULES = `You tailor the candidate's existing document to a job posting by making MINIMAL keyword/wording changes. The layout, structure, and all content stay intact — you only patch small pieces.
+HARD CONSTRAINTS:
+- NEVER add, rename, or substitute any technology, tool, employer, title, or domain that is NOT already in the document (e.g. don't turn "CakePHP" into "Symfony", don't add "Kubernetes"/"HL7"/"FHIR"). Never fabricate to close a gap — honest gaps stay visible.
+- Do NOT shorten, remove, reorder, or drop any section, role, bullet, project, or skill.
+YOU MAY (via patches): rephrase the headline and summary using only skills already present, to foreground genuinely-relevant experience; name the target company in the summary; tighten wording.
+EXCEPTION — CANDIDATE'S ADDITIONAL NOTES: if provided, you MAY add the facts/skills/availability they state (the candidate asserts they are true) to address the posting. Those notes are the ONLY permitted additions.
+${PATCH_FORMAT}`;
 
-WHAT YOU MAY DO (only this):
-- Rephrase the summary/profile and headline using ONLY words and skills already present in the document, to foreground the genuinely-relevant experience.
-- Reorder existing skills/bullets so the most relevant TRUE ones appear first.
-- Adjust tone/wording. You may name the target company in the summary as an aspiration (e.g. "eager to contribute to <Company>").
-- EXCEPTION — CANDIDATE'S ADDITIONAL NOTES: if a "CANDIDATE'S ADDITIONAL NOTES" section is provided, you MAY add the facts, skills, experience, or availability stated there (the candidate asserts they are true), weaving them in naturally to address the posting. Those notes are the ONLY permitted source of additions beyond the original document.
-
-Preserve the document's format exactly. If it is LaTeX, return valid LaTeX with the SAME preamble, packages, structure, environments, and commands; keep image/graphics commands intact.
-Return ONLY the complete tailored document. No markdown code fences, no commentary before or after.`;
-
-export const TAILOR_CV_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's CV/résumé.`;
-export const TAILOR_COVER_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's cover letter. Also update the addressed company/role and the specific hook to fit this posting, keeping the same overall length and structure.`;
+export const TAILOR_CV_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's CV/résumé — usually only the headline and summary need patching.`;
+export const TAILOR_COVER_SYSTEM = `${TAILOR_RULES}\nThis document is the candidate's cover letter — you may also patch the addressed company/role and the opening hook to fit this posting.`;
 
 // Candidate-provided notes block (true facts the profile/CV may have missed).
 function notesBlock(notes?: string): string {
@@ -139,20 +143,62 @@ function notesBlock(notes?: string): string {
 }
 
 export function tailorUser(originalDoc: string, jobText: string, notes?: string): string {
-  return `TARGET JOB POSTING:\n${jobText}${notesBlock(notes)}\n\nORIGINAL DOCUMENT TO TAILOR (return a tailored copy in the SAME format, changing only wording/keywords and weaving in any notes above where they genuinely strengthen the match):\n${originalDoc}`;
+  return `TARGET JOB POSTING:\n${jobText}${notesBlock(notes)}\n\nDOCUMENT TO TAILOR (copy FIND snippets verbatim from this):\n${originalDoc}`;
 }
 
 // Edit the user's MASTER template (CV or cover) per a natural-language instruction.
-export const EDIT_TEMPLATE_SYSTEM = `You edit a LaTeX document according to the user's instruction. This is the user's master template, so precision matters.
-RULES:
-- Apply ONLY the requested change (add / update / remove exactly what the instruction says).
-- Preserve EVERYTHING else exactly: same \\documentclass, preamble, packages, colors, layout, commands, and all other sections and their content. Do not shorten, reword, reorder, or drop anything that the instruction doesn't mention.
-- When adding content, match the document's existing formatting/commands and place it where the instruction says (e.g. a new entry in the "Selected Project" section).
-- Keep the output as valid, compilable LaTeX (balanced braces/environments; don't add packages unless strictly required by the requested change).
-Return ONLY the complete updated LaTeX document — no markdown code fences, no commentary before or after.`;
+export const EDIT_TEMPLATE_SYSTEM = `You edit the user's master LaTeX document per an instruction. Apply ONLY the requested change and preserve everything else.
+- To ADD (e.g. a new "Selected Project" entry): FIND a nearby anchor (the end of the previous entry) and put that anchor + the new content in REPLACE, matching the surrounding entries' LaTeX style.
+- To REMOVE: FIND the exact block; REPLACE with what should remain.
+- Never restructure, reword, shorten, or touch anything the instruction doesn't mention. Never invent facts.
+${PATCH_FORMAT}`;
 
 export function editTemplateUser(instruction: string, doc: string): string {
-  return `INSTRUCTION:\n${instruction}\n\nCURRENT DOCUMENT (return the full document with the instruction applied):\n${doc}`;
+  return `INSTRUCTION:\n${instruction}\n\nDOCUMENT (copy FIND snippets verbatim from this):\n${doc}`;
+}
+
+// Apply @@FIND@@/@@REPLACE@@/@@END@@ patches to a document. Matching is exact first,
+// then whitespace-tolerant (models often reflow spaces/newlines when copying), so a
+// minor copy difference doesn't drop the edit. Bare "&" in replacements is escaped.
+export function applyLatexPatches(
+  original: string,
+  modelText: string,
+): { updated: string; applied: number; missed: string[] } {
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const locate = (hay: string, needle: string): [number, number] | null => {
+    const i = hay.indexOf(needle);
+    if (i >= 0) return [i, i + needle.length];
+    const trimmed = needle.trim();
+    if (!trimmed) return null;
+    try {
+      const m = new RegExp(trimmed.split(/\s+/).map(escapeRegex).join('\\s+')).exec(hay);
+      if (m) return [m.index, m.index + m[0].length];
+    } catch {
+      /* ignore */
+    }
+    return null;
+  };
+
+  // Lenient marker matching: tolerate spaces in/around markers, missing newlines, and
+  // case, since models format the delimiters inconsistently.
+  const blocks = [
+    ...modelText.matchAll(/@@\s*FIND\s*@@\r?\n?([\s\S]*?)\r?\n?@@\s*REPLACE\s*@@\r?\n?([\s\S]*?)\r?\n?@@\s*END\s*@@/gi),
+  ];
+  let updated = original;
+  let applied = 0;
+  const missed: string[] = [];
+  for (const b of blocks) {
+    const find = b[1];
+    const replacement = b[2].replace(/(?<!\\)&/g, '\\&'); // escape stray bare &
+    const loc = locate(updated, find);
+    if (!loc) {
+      missed.push(find.slice(0, 60));
+      continue;
+    }
+    updated = updated.slice(0, loc[0]) + replacement + updated.slice(loc[1]);
+    applied++;
+  }
+  return { updated, applied, missed };
 }
 
 // ── User-prompt builders ──

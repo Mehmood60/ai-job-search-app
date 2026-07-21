@@ -4,7 +4,7 @@ import { asyncHandler, AppError } from '../../http/errors';
 import { requireAuth } from '../../auth/middleware';
 import { aiLimiter } from '../../http/rateLimit';
 import { completeWithSettings } from '../../ai/registry';
-import { EDIT_TEMPLATE_SYSTEM, editTemplateUser } from '../../prompts';
+import { EDIT_TEMPLATE_SYSTEM, editTemplateUser, applyLatexPatches } from '../../prompts';
 import { compileTectonic } from '../../pdf/tectonic';
 import { findAsset } from '../../pdf/assets';
 import { loadSettings } from '../userData';
@@ -20,12 +20,6 @@ import {
 
 const router = Router();
 router.use(requireAuth);
-
-// Strip an accidental ```lang ... ``` fence around model output.
-function stripFence(s: string): string {
-  const m = s.match(/^```[a-zA-Z]*\s*\n([\s\S]*?)\n```\s*$/);
-  return (m ? m[1] : s).trim();
-}
 
 const providerId = z.string().min(1);
 
@@ -112,10 +106,33 @@ router.post(
     const { text, usedProvider } = await completeWithSettings(settings, {
       system: EDIT_TEMPLATE_SYSTEM,
       user: editTemplateUser(instruction, current),
-      maxTokens: 9000, // fit the whole document + a thinking model's overhead
-      temperature: 0.2,
+      maxTokens: 8000, // patches are tiny, but leave room if the model returns a full doc
+      temperature: 0.1,
+      timeoutMs: 150_000,
     });
-    res.json({ template: stripFence(text), usedProvider });
+
+    const result = applyLatexPatches(current, text);
+    let updated = result.updated;
+    let applied = result.applied;
+    const missed = result.missed;
+    if (applied === 0) {
+      // Fallback: the model may have ignored the patch format and returned the whole
+      // edited document. If it looks like a complete LaTeX doc of a sane size, use it
+      // (escaping stray bare & the model may have left in prose).
+      const m = text.match(/\\documentclass[\s\S]*\\end\{document\}/);
+      if (m && m[0].length > current.length * 0.5) {
+        updated = m[0].replace(/(?<!\\)&/g, '\\&');
+        applied = 1;
+      }
+    }
+    if (applied === 0) {
+      throw new AppError(
+        422,
+        'Could not apply the edit — the AI response could not be parsed. Try again (or switch model), or rephrase the command to be specific about what to add/change and where.',
+        'EDIT_FAILED',
+      );
+    }
+    res.json({ template: updated, usedProvider, applied, missed });
   }),
 );
 

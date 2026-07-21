@@ -11,6 +11,8 @@ export interface CompleteOptions {
   json?: boolean;
   // sampling temperature (lower = more faithful/deterministic)
   temperature?: number;
+  // per-call request timeout in ms (default 60s); raise for heavy full-document calls
+  timeoutMs?: number;
 }
 
 // Uniform interface every AI provider implements.
@@ -43,6 +45,7 @@ export async function openAiCompatibleComplete(
     ],
   });
 
+  const timeoutMs = opts.timeoutMs ?? 60_000;
   let res: Response;
   // Retry transient upstream errors (502/503/504 — gateway/timeout blips) once.
   for (let attempt = 0; ; attempt++) {
@@ -51,14 +54,14 @@ export async function openAiCompatibleComplete(
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body,
-        signal: AbortSignal.timeout(60_000), // don't hang forever on a stalled provider/proxy
+        signal: AbortSignal.timeout(timeoutMs), // don't hang forever on a stalled provider/proxy
       });
     } catch (e) {
       const err = e as Error;
       if (err.name === 'TimeoutError' || err.name === 'AbortError') {
         throw new AppError(
           504,
-          'The AI provider took too long to respond (60s). Try again, or switch provider in Settings.',
+          `The AI provider took too long to respond (${Math.round(timeoutMs / 1000)}s). Try again, use a faster model, or switch provider in Settings.`,
           'TIMEOUT',
         );
       }
