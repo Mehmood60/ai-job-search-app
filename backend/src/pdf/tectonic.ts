@@ -25,9 +25,13 @@ function resolveTectonicBin(): string {
   return env.TECTONIC_PATH || 'tectonic';
 }
 
-// Compile a complete standalone LaTeX document to PDF using Tectonic (self-contained,
-// headless — no MiKTeX update nags, auto-fetches packages, caches its bundle).
-export async function compileTectonic(tex: string, assets: TexAsset[] = []): Promise<Buffer> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Serialize all Tectonic runs — its bundle cache is not concurrency-safe on Windows
+// and overlapping runs can crash with heap corruption (exit 0xC0000374).
+let queue: Promise<unknown> = Promise.resolve();
+
+async function compileOnce(tex: string, assets: TexAsset[]): Promise<Buffer> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'aijs-tec-'));
   const texPath = path.join(dir, 'doc.tex');
   const pdfPath = path.join(dir, 'doc.pdf');
@@ -41,6 +45,26 @@ export async function compileTectonic(tex: string, assets: TexAsset[] = []): Pro
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+// Compile a complete standalone LaTeX document to PDF using Tectonic (self-contained,
+// headless — no MiKTeX update nags, auto-fetches packages, caches its bundle). Runs are
+// serialized (never concurrent) and retried once on a crash.
+export async function compileTectonic(tex: string, assets: TexAsset[] = []): Promise<Buffer> {
+  const run = queue.then(async () => {
+    try {
+      return await compileOnce(tex, assets);
+    } catch {
+      // Retry once after a short pause (Tectonic can crash transiently on Windows).
+      await sleep(500);
+      return compileOnce(tex, assets);
+    }
+  });
+  queue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 function run(cmd: string, args: string[], cwd: string): Promise<void> {
